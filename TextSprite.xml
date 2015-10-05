@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<Sprites>
-    <Sprite Name="Arrow" Cycle="1">
-        <Frame Texture="IronCombatText\ic_long_press.tga" x0="20" x1="20" x2="20" x3="20" x4="20" x5="125" y0="18" y1="18" y2="18" y3="18" y4="18" y5="124" HotspotX="0" HotspotY="0" Duration="1.000" StartColor="white" EndColor="white"/>
-    </Sprite>
-</Sprites>

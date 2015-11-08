@@ -1,6 +1,8 @@
 -----------------------------------------------------------------------------------------------
--- Client Lua Script for FloatTextPanel
--- Copyright (c) NCsoft. All rights reserved
+-- Client Lua Script for IronCombatText
+-- Based heavily on Carbine's FloatText addon.
+
+-- Made by Iron Oxide, 2015
 -----------------------------------------------------------------------------------------------
 
 require "Window"
@@ -10,36 +12,24 @@ require "GameLib"
 require "Unit"
 
 local IronCombatText = {}
-
 local knTestingVulnerable = -1
 
--- Helper function for taking unlimited arguments to a function.
-local function GoodPrint(...)
-    local args = { n = select("#", ...), ... }
-    local toPrint = ""
-    for i = 1, args.n do
-        local arg
-        if (args[i] ~= nil) then 
-            arg = tostring(args[i])
-        else
-            arg = "nil"
-        end
-        toPrint = toPrint .. arg .. " "
-    end
-    Print(toPrint)
-end
-
+---------------------------------------------------------------------------------------------------
 function IronCombatText:new(o)
+---------------------------------------------------------------------------------------------------
 	o = o or {}
 	setmetatable(o, self)
 	self.__index = self
 	
+	self.Utils = nil
 	self.Options = nil
 	
 	return o
 end
 
+---------------------------------------------------------------------------------------------------
 function IronCombatText:Init()
+---------------------------------------------------------------------------------------------------
 	local bHasConfigureFunction = true
 	local strConfigureButtonText = "Iron Combat Text"
 	local tDependencies = {
@@ -49,7 +39,9 @@ function IronCombatText:Init()
 end
 
 -- Save settings, character level
+---------------------------------------------------------------------------------------------------
 function IronCombatText:OnSave(eType)
+---------------------------------------------------------------------------------------------------
 	if eType == GameLib.CodeEnumAddonSaveLevel.Character then
 		return self.tSettings
 	end
@@ -57,13 +49,320 @@ function IronCombatText:OnSave(eType)
 	return nil
 end
 
+---------------------------------------------------------------------------------------------------
+function IronCombatText:PatternCircular(tParams)
+---------------------------------------------------------------------------------------------------
+	local tTextOption			= self:GetDefaultTextOption()
+	local fMaxSize 				= tParams.fMaxSize
+	local fMaxDuration 			= tParams.fMaxDuration
+	local nBaseColor            = tParams.nBaseColor
+	local fBigScale             = tParams.fBigScale
+	tTextOption.bShowOnTop 		= true
+	tTextOption.eCollisionMode 	= tParams.eCollision
+	tTextOption.strFontFace 	= tParams.strFontFace
+	tTextOption.eLocation 		= tParams.eLocation
+	
+	-- Default options
+	tTextOption.fOffsetDirection = math.random(0, 360)
+	tTextOption.fOffset 		 = math.random(10, 100)/100
+	tTextOption.arFrames =
+	{
+		[1] = {fScale = (fMaxSize) * 0.8,	  fTime = 0,			fVelocityDirection = tTextOption.fOffsetDirection, fVelocityMagnitude = 5, nColor = nBaseColor,	},
+		[2] = {fScale = fMaxSize,			  fTime = .15,			fAlpha = 1.0,},   
+		[3] = {fScale = fMaxSize * fBigScale, fTime = .3,		    fAlpha = 0.95,},
+		[4] = {fScale = fMaxSize,			  fTime = .5,			fAlpha = 0.9,},
+		[5] = {fScale = fMaxSize * fBigScale, fTime = 0.75, 		fAlpha = 0.8 },
+		[6] = {								  fTime = fMaxDuration,	fAlpha = 0.0,},
+	}
+	
+	return tTextOption
+end
+
+
+---------------------------------------------------------------------------------------------------
+function IronCombatText:PatternDefault(tParams)
+---------------------------------------------------------------------------------------------------
+	local tTextOption = self:GetDefaultTextOption()
+	local fMaxSize 				= tParams.fMaxSize
+	local fMaxDuration 			= tParams.fMaxDuration
+	local nBaseColor            = tParams.nBaseColor
+	local fBigScale             = tParams.fBigScale
+	tTextOption.bShowOnTop 		= true
+	tTextOption.eCollisionMode 	= tParams.eCollisionMode
+	tTextOption.strFontFace 	= tParams.strFontFace
+	tTextOption.eLocation 		= tParams.eLocation
+	
+	-- Default options
+	local offsetDirection 		 = math.random(0, 100) - 50
+	tTextOption.fOffsetDirection = offsetDirection
+	tTextOption.fOffset 	     = math.random(10, 100)/100
+	tTextOption.arFrames =
+	{
+		[1] = {fScale = (fMaxSize) * 0.8,	  fTime = 0,			fVelocityDirection = offsetDirection, fVelocityMagnitude = 5, nColor = nBaseColor,	},
+		[2] = {fScale = fMaxSize,			  fTime = .15,			fAlpha = 1.0,},   
+		[3] = {fScale = fMaxSize * fBigScale, fTime = .3,		    fAlpha = 0.95,},
+		[4] = {fScale = fMaxSize,			  fTime = .5,			fAlpha = 0.9,},
+		[5] = {fScale = fMaxSize * fBigScale, fTime = 0.75, 		fAlpha = 0.8 },
+		[6] = {								  fTime = fMaxDuration,	fAlpha = 0.0,},
+	}
+	
+	return tTextOption
+end
+
+---------------------------------------------------------------------------------------------------
+function IronCombatText:PatternStreamUpRight(tParams)
+---------------------------------------------------------------------------------------------------
+	local tTextOption 			= self:GetDefaultTextOption()
+	local fMaxSize 				= tParams.fMaxSize
+	local fMaxDuration 			= tParams.fMaxDuration
+	local nBaseColor            = tParams.nBaseColor
+	local fBigScale             = tParams.fBigScale
+	tTextOption.bShowOnTop 		= true
+	tTextOption.eCollisionMode 	= tParams.eCollisionMode
+	tTextOption.strFontFace 	= tParams.strFontFace
+	tTextOption.eLocation 		= tParams.eLocation
+	
+	tTextOption.fOffsetDirection = math.random(200,220) -- 5 o'clock
+	tTextOption.fOffset 		 = math.random(15,35)/10
+	
+	-- scale and movement
+	-- Default movement:
+	-- t5             123
+	-- t4              123
+	-- t3               123
+	-- t2              123
+	-- t1              123
+	-- t0            123
+	tTextOption.arFrames =
+	{
+		[1] = {fScale = fMaxSize * 0.8,	        fTime = 0,			fVelocityDirection = -45, fVelocityMagnitude = 5,						nColor = nBaseColor,	},
+		[2] = {fScale = fMaxSize,				fTime = .15,		fVelocityDirection = -30, fVelocityMagnitude = 5,	fAlpha = 1.0,							},
+		[3] = {fScale = fMaxSize * fBigScale,	fTime = .30,		fVelocityDirection = -15, fVelocityMagnitude = 5,						nColor = nBaseColor,	},
+		[4] = {fScale = fMaxSize,				fTime = .45,		fVelocityDirection = 15,  fVelocityMagnitude = 5,	fAlpha = 0.85,						},
+		[5] = {fScale = fMaxSize * fBigScale,	fTime = .75,		fVelocityDirection = 30,  fVelocityMagnitude = 5,	fAlpha = 0.65,						},
+		[6] = {									fTime = fMaxDuration,													fAlpha = 0.0,							},
+	}
+
+	
+	return tTextOption
+end
+
+---------------------------------------------------------------------------------------------------
+function IronCombatText:PatternStreamDownRight(tParams)
+---------------------------------------------------------------------------------------------------
+	local tTextOption 			= self:GetDefaultTextOption()
+	local fMaxSize 				= tParams.fMaxSize
+	local fMaxDuration 			= tParams.fMaxDuration
+	local nBaseColor            = tParams.nBaseColor
+	local fBigScale             = tParams.fBigScale
+	tTextOption.bShowOnTop 		= true
+	tTextOption.eCollisionMode 	= tParams.eCollisionMode
+	tTextOption.strFontFace 	= tParams.strFontFace
+	tTextOption.eLocation 		= tParams.eLocation
+	
+	tTextOption.fOffsetDirection = math.random(340,355) -- 5 o'clock
+	tTextOption.fOffset			 = math.random(15,35)/10
+	
+	-- scale and movement
+	-- Default movement:
+	-- t5             123
+	-- t4              123
+	-- t3               123
+	-- t2              123
+	-- t1              123
+	-- t0            123
+	tTextOption.arFrames =
+	{
+		[1] = {fScale = fMaxSize * 0.8,	        fTime = 0,			fVelocityDirection = 230, 	fVelocityMagnitude = 5,						nColor = nBaseColor,	},
+		[2] = {fScale = fMaxSize,				fTime = .15,		fVelocityDirection = 215, 	fVelocityMagnitude = 5,	fAlpha = 1.0,							},
+		[3] = {fScale = fMaxSize * fBigScale,	fTime = .30,		fVelocityDirection = 200, 	fVelocityMagnitude = 5,						nColor = nBaseColor,	},
+		[4] = {fScale = fMaxSize,				fTime = .45,		fVelocityDirection = -200,  fVelocityMagnitude = 5,	fAlpha = 0.85,						},
+		[5] = {fScale = fMaxSize * fBigScale,	fTime = .75,		fVelocityDirection = -215,  fVelocityMagnitude = 5,	fAlpha = 0.65,						},
+		[6] = {									fTime = fMaxDuration,													fAlpha = 0.0,							},
+	}
+
+	
+	return tTextOption
+end
+
+---------------------------------------------------------------------------------------------------
+function IronCombatText:PatternStreamDownLeft(tParams)
+---------------------------------------------------------------------------------------------------
+	local tTextOption 			= self:GetDefaultTextOption()
+	local fMaxSize 				= tParams.fMaxSize
+	local fMaxDuration 			= tParams.fMaxDuration
+	local nBaseColor            = tParams.nBaseColor
+	local fBigScale             = tParams.fBigScale
+	tTextOption.bShowOnTop 		= true
+	tTextOption.eCollisionMode 	= tParams.eCollisionMode
+	tTextOption.strFontFace 	= tParams.strFontFace
+	tTextOption.eLocation 		= tParams.eLocation
+	
+	tTextOption.fOffsetDirection = math.random(200,220) -- 5 o'clock
+	tTextOption.fOffset = math.random(15,35)/10
+	
+	-- scale and movement
+	-- Default movement:
+	-- t5             123
+	-- t4              123
+	-- t3               123
+	-- t2              123
+	-- t1              123
+	-- t0            123
+	tTextOption.arFrames =
+	{
+		[1] = {fScale = fMaxSize * 0.8,	        fTime = 0,			fVelocityDirection = -45, fVelocityMagnitude = 5,						nColor = nBaseColor,	},
+		[2] = {fScale = fMaxSize,				fTime = .15,		fVelocityDirection = -30, fVelocityMagnitude = 5,	fAlpha = 1.0,							},
+		[3] = {fScale = fMaxSize * fBigScale,	fTime = .30,		fVelocityDirection = -15, fVelocityMagnitude = 5,						nColor = nBaseColor,	},
+		[4] = {fScale = fMaxSize,				fTime = .45,		fVelocityDirection = 15,  fVelocityMagnitude = 5,	fAlpha = 0.85,						},
+		[5] = {fScale = fMaxSize * fBigScale,	fTime = .75,		fVelocityDirection = 30,  fVelocityMagnitude = 5,	fAlpha = 0.65,						},
+		[6] = {									fTime = fMaxDuration,													fAlpha = 0.0,							},
+	}
+
+	
+	return tTextOption
+end
+
+---------------------------------------------------------------------------------------------------
+function IronCombatText:PatternStreamUpLeft(tParams)
+---------------------------------------------------------------------------------------------------
+	local tTextOption 			= self:GetDefaultTextOption()
+	local fMaxSize 				= tParams.fMaxSize
+	local fMaxDuration 			= tParams.fMaxDuration
+	local nBaseColor            = tParams.nBaseColor
+	local fBigScale             = tParams.fBigScale
+	tTextOption.bShowOnTop 		= true
+	tTextOption.eCollisionMode 	= tParams.eCollisionMode
+	tTextOption.strFontFace 	= tParams.strFontFace
+	tTextOption.eLocation 		= tParams.eLocation
+	
+	tTextOption.fOffsetDirection = math.random(200,220) -- 5 o'clock
+	tTextOption.fOffset = math.random(15,35)/10
+	
+	-- scale and movement
+	-- Default movement:
+	-- t5             123
+	-- t4              123
+	-- t3               123
+	-- t2              123
+	-- t1              123
+	-- t0            123
+	tTextOption.arFrames =
+	{
+		[1] = {fScale = fMaxSize * 0.8,	        fTime = 0,			fVelocityDirection = -45, fVelocityMagnitude = 5,						nColor = nBaseColor,	},
+		[2] = {fScale = fMaxSize,				fTime = .15,		fVelocityDirection = -30, fVelocityMagnitude = 5,	fAlpha = 1.0,							},
+		[3] = {fScale = fMaxSize * fBigScale,	fTime = .30,		fVelocityDirection = -15, fVelocityMagnitude = 5,						nColor = nBaseColor,	},
+		[4] = {fScale = fMaxSize,				fTime = .45,		fVelocityDirection = 15,  fVelocityMagnitude = 5,	fAlpha = 0.85,						},
+		[5] = {fScale = fMaxSize * fBigScale,	fTime = .75,		fVelocityDirection = 30,  fVelocityMagnitude = 5,	fAlpha = 0.65,						},
+		[6] = {									fTime = fMaxDuration,													fAlpha = 0.0,							},
+	}
+
+	
+	return tTextOption
+end
+
+---------------------------------------------------------------------------------------------------
+function IronCombatText:PatternStraightUp(tParams)
+---------------------------------------------------------------------------------------------------
+	local tTextOption 			= self:GetDefaultTextOption()
+	local fMaxSize 				= tParams.fMaxSize
+	local fMaxDuration 			= tParams.fMaxDuration
+	local nBaseColor            = tParams.nBaseColor
+	local fBigScale             = tParams.fBigScale
+	tTextOption.bShowOnTop 		= true
+	tTextOption.eCollisionMode 	= tParams.eCollisionMode
+	tTextOption.strFontFace 	= tParams.strFontFace
+	tTextOption.eLocation 		= tParams.eLocation
+	
+	tTextOption.fOffsetDirection = 0 -- 5 o'clock
+	tTextOption.fOffset = 0
+	
+	-- scale and movement
+	-- Default movement:
+	-- t5             123
+	-- t4              123
+	-- t3               123
+	-- t2              123
+	-- t1              123
+	-- t0            123
+	tTextOption.arFrames =
+	{
+		[1] = {fScale = fMaxSize * 0.8,	        fTime = 0,			fVelocityDirection = 0, fVelocityMagnitude = 5,						nColor = nBaseColor,	},
+		[2] = {fScale = fMaxSize,				fTime = .15,			fAlpha = 1.0,							},
+		[3] = {fScale = fMaxSize * fBigScale,	fTime = .30,							nColor = nBaseColor,	},
+		[4] = {fScale = fMaxSize,				fTime = .45,			fAlpha = 0.85,						},
+		[5] = {fScale = fMaxSize * fBigScale,	fTime = .75,			fAlpha = 0.65,						},
+		[6] = {									fTime = fMaxDuration,													fAlpha = 0.0,							},
+	}
+
+	
+	return tTextOption
+end
+
+---------------------------------------------------------------------------------------------------
+function IronCombatText:PatternStraightDown(tParams)
+---------------------------------------------------------------------------------------------------
+	local tTextOption 			= self:GetDefaultTextOption()
+	local fMaxSize 				= tParams.fMaxSize
+	local fMaxDuration 			= tParams.fMaxDuration
+	local nBaseColor            = tParams.nBaseColor
+	local fBigScale             = tParams.fBigScale
+	tTextOption.bShowOnTop 		= true
+	tTextOption.eCollisionMode 	= tParams.eCollisionMode
+	tTextOption.strFontFace 	= tParams.strFontFace
+	tTextOption.eLocation 		= tParams.eLocation
+	
+	tTextOption.fOffsetDirection = 0 -- 5 o'clock
+	tTextOption.fOffset = 0
+	
+	-- scale and movement
+	-- Default movement:
+	-- t5             123
+	-- t4              123
+	-- t3               123
+	-- t2              123
+	-- t1              123
+	-- t0            123
+	tTextOption.arFrames =
+	{
+		[1] = {fScale = fMaxSize * 0.8,	        fTime = 0,			fVelocityDirection = 180, fVelocityMagnitude = 5,						nColor = nBaseColor,	},
+		[2] = {fScale = fMaxSize,				fTime = .15,		fAlpha = 1.0,							},
+		[3] = {fScale = fMaxSize * fBigScale,	fTime = .30,								nColor = nBaseColor,	},
+		[4] = {fScale = fMaxSize,				fTime = .45,		fAlpha = 0.85,						},
+		[5] = {fScale = fMaxSize * fBigScale,	fTime = .75,		fAlpha = 0.65,						},
+		[6] = {									fTime = fMaxDuration,  fAlpha = 0.0,							},
+	}
+
+	
+	return tTextOption
+end
+
+---------------------------------------------------------------------------------------------------
+function IronCombatText:InitPatternTable()
+---------------------------------------------------------------------------------------------------
+	self.patternTable = {
+		Circular        = function(...) return self:PatternCircular        (...) end,
+		Default         = function(...) return self:PatternDefault         (...) end,
+		StreamUpRight   = function(...) return self:PatternStreamUpRight   (...) end,
+		StreamDownRight = function(...) return self:PatternStreamDownRight (...) end,
+		StreamUpLeft    = function(...) return self:PatternStreamUpLeft    (...) end,
+		StreamDownLeft  = function(...) return self:PatternStreamDownLeft  (...) end,
+		StraightUp      = function(...) return self:PatternStraightUp      (...) end,
+		StraightDown    = function(...) return self:PatternStraightDown    (...) end,
+	}
+end
+
+---------------------------------------------------------------------------------------------------
 function IronCombatText:OnConfigure()
+---------------------------------------------------------------------------------------------------
 	self.Options:OnInvokeOptions()
 end
 
 
 -- Setup the settings, character level
+---------------------------------------------------------------------------------------------------
 function IronCombatText:OnRestore(eType, tSaveData)
+---------------------------------------------------------------------------------------------------
 	if eType ~= GameLib.CodeEnumAddonSaveLevel.Character then return end
 
 	if tSaveData == nil then
@@ -73,7 +372,9 @@ function IronCombatText:OnRestore(eType, tSaveData)
 	end
 end
 
+---------------------------------------------------------------------------------------------------
 function IronCombatText:CompareSettings(tOther)
+---------------------------------------------------------------------------------------------------
 	local tDefault = self:GetDefaultSettings()
 	for kRhs, vRhs in pairs(tDefault) do
 		for kLhs, vRhs in pairs(tOther) do
@@ -87,62 +388,83 @@ function IronCombatText:CompareSettings(tOther)
 end
 
 -- Default Settings that are loaded with the addon if there's no save data
+---------------------------------------------------------------------------------------------------
 function IronCombatText:GetDefaultSettings()
+---------------------------------------------------------------------------------------------------
 	local tSettings = {}
+	
 	tSettings.bShowMultiHit      = true
 	
-	-- Default colors
-	
 	-- Damage Out
-	tSettings.cDmgDefault 		 = 0xf4e443
-	tSettings.cDmgMultiHit 		 = 0x0088ff
-	tSettings.cDmgCrit 			 = 0xfffb93
-	tSettings.cDmgVuln 			 = 0xf5a2ff
-	
-	-- Damage In
-	tSettings.cDmgInDefault 	 = 0xff3333
-	tSettings.cDmgInCrit 		 = 0xff0000
-	tSettings.cDmgInAbsorb	     = 0xffffff
-	
-	-- Heal Out
-	tSettings.cHealDefault 		 = 0x73E684
-	tSettings.cHealCrit 		 = 0x4AE862
-	tSettings.cHealMultiHit 	 = 0x469AE3
-	tSettings.cHealShield 		 = 0x68DBE3
-	
-	-- Heal In
-	tSettings.cHealInDefault 	 = 0x73E684
-	tSettings.cHealInCrit 		 = 0x4AE862
-	tSettings.cHealInShield      = 0x68DBE3
-	
-	-- Default scale/values
+	tSettings.cDmgDefault 		  = 0xf4e443
+	tSettings.cDmgMultiHit 		  = 0x0088ff
+	tSettings.cDmgCrit 			  = 0xfffb93
+	tSettings.cDmgVuln 			  = 0xf5a2ff
+	tSettings.cDmgAbsorb          = 0xffffff
 	tSettings.iDmgBigCritOutValue = 10000
-	tSettings.iDmgBigCritInValue  = 30000
-	tSettings.iHealBigCritValue   = 10000
-	tSettings.iHealInBigCritValue  = 10000
+	tSettings.iDmgOutThreshold    = 0
 	tSettings.fDmgOutNormalScale  = 1.0
 	tSettings.fDmgOutCritScale 	  = 1.25
+	tSettings.fDmgOutDuration     = 1.25
+	tSettings.nDmgOutPattern      = "Default"
+	tSettings.fDmgOutAlpha        = 1.0
+	tSettings.nDmgOutCollision    = CombatFloater.CodeEnumFloaterCollisionMode.IgnoreCollision
+	tSettings.bDmgOutMergeShield  = true
+	tSettings.bDmgOutShowAbsorb   = true
+
+	-- Damage In
+	tSettings.cDmgInDefault 	  = 0xff3333
+	tSettings.cDmgInCrit 		  = 0xff0000
+	tSettings.cDmgInAbsorb	      = 0xffffff
 	tSettings.fDmgInCritScale 	  = 1.0
 	tSettings.fDmgInNormalScale   = 0.75
+	tSettings.nDmgInPattern       = "Default"
+	tSettings.nDmgInCollision     = CombatFloater.CodeEnumFloaterCollisionMode.IgnoreCollision
 	
-	-- Healing In Scale
-	tSettings.fHealInNormalScale  = 0.75
-	tSettings.fHealInCritScale    = 1.0
-	
-	-- Healing Out Scale
+	-- Heal Out
+	tSettings.cHealDefault 		  = 0x73E684
+	tSettings.cHealCrit 		  = 0x4AE862
+	tSettings.cHealMultiHit 	  = 0x469AE3
+	tSettings.cHealShield 		  = 0x68DBE3
+	tSettings.iHealBigCritValue   = 10000
+	tSettings.iHealOutThreshold   = 0
 	tSettings.fHealOutNormalScale = 0.85
 	tSettings.fHealOutCritScale   = 1.0
+	tSettings.nHealOutPattern     = "Default"
+	tSettings.nHealOutCollision   = CombatFloater.CodeEnumFloaterCollisionMode.IgnoreCollision
+	
+	-- Heal In
+	tSettings.cHealInDefault 	  = 0x73E684
+	tSettings.cHealInCrit 		  = 0x4AE862
+	tSettings.cHealInShield       = 0x68DBE3
+	tSettings.iDmgBigCritInValue  = 30000
+	tSettings.iHealInBigCritValue = 10000
+	tSettings.iHealInThreshold    = 0
+	tSettings.fHealInNormalScale  = 0.85
+	tSettings.fHealInCritScale    = 1.0
+	tSettings.nHealInPattern      = "Default"
+	tSettings.nHealInCollision    = CombatFloater.CodeEnumFloaterCollisionMode.IgnoreCollision
 	
 	-- Default fonts
-	tSettings.nDmgOutFont  = "CRB_FloaterLarge"
-	tSettings.nDmgInFont   = "CRB_FloaterLarge"
-	tSettings.nHealOutFont = "CRB_FloaterLarge"
-	tSettings.nHealInFont  = "CRB_FloaterLarge"
+	tSettings.nDmgOutFont  = "CRB_HeaderLarge"
+	tSettings.nDmgInFont   = "CRB_HeaderLarge"
+	tSettings.nHealOutFont = "CRB_HeaderLarge"
+	tSettings.nHealInFont  = "CRB_HeaderLarge"
+	
+	-- Default positions
+	tSettings.nDmgOutPos   = CombatFloater.CodeEnumFloaterLocation.Chest
+	tSettings.nDmgInPos    = CombatFloater.CodeEnumFloaterLocation.Chest
+	tSettings.nHealOutPos  = CombatFloater.CodeEnumFloaterLocation.Chest
+	tSettings.nHealInPos   = CombatFloater.CodeEnumFloaterLocation.Chest
+	
+	tSettings.currentCategory = "General"
+	
 	return tSettings
 end	
 
+---------------------------------------------------------------------------------------------------
 function IronCombatText:OnLoad()
-	-- load our form file
+---------------------------------------------------------------------------------------------------
 	-- Test to see if we have settings
 	if self.tSettings == nil then
 		self.tSettings = self:GetDefaultSettings()
@@ -150,46 +472,44 @@ function IronCombatText:OnLoad()
 		self.tSettings = self:CompareSettings(self.tSettings)
 	end
 	
+	self.Utils.Init(self)
 	self.Options:Init(self)
 	self.Options.tSettings = self.tSettings
-	
-	-- if the xmlDoc is no longer needed, you should set it to nil
-	-- self.xmlDoc = nil
 	
 	-- Register handlers for events, slash commands and timer, etc.
 	-- e.g. Apollo.RegisterEventHandler("KeyDown", "OnKeyDown", self)
 
-	Apollo.RegisterEventHandler("OptionsUpdated_Floaters", 					"OnOptionsUpdated", self)
-
-	Apollo.RegisterEventHandler("ChannelUpdate_Loot",						"OnChannelUpdate_Loot", self)
-	Apollo.RegisterEventHandler("SpellCastFailed", 							"OnSpellCastFailed", self)
-	Apollo.RegisterEventHandler("DamageOrHealingDone",				 		"OnDamageOrHealing", self)
-	Apollo.RegisterEventHandler("CombatMomentum", 							"OnCombatMomentum", self)
-	Apollo.RegisterEventHandler("ExperienceGained", 						"OnExperienceGained", self)	-- UI_XPChanged ?
-	Apollo.RegisterEventHandler("ElderPointsGained", 						"OnElderPointsGained", self)
-	Apollo.RegisterEventHandler("UpdatePathXp", 							"OnPathExperienceGained", self)
-	Apollo.RegisterEventHandler("AttackMissed", 							"OnMiss", self)
-	Apollo.RegisterEventHandler("SubZoneChanged", 							"OnSubZoneChanged", self)
-	Apollo.RegisterEventHandler("RealmBroadcastTierMedium", 				"OnRealmBroadcastTierMedium", self)
-	Apollo.RegisterEventHandler("GenericError", 							"OnGenericError", self)
-	Apollo.RegisterEventHandler("PrereqFailureMessage",					 	"OnPrereqFailed", self)
-	Apollo.RegisterEventHandler("GenericFloater", 							"OnGenericFloater", self)
-	Apollo.RegisterEventHandler("UnitEvaded", 								"OnUnitEvaded", self)
-	Apollo.RegisterEventHandler("QuestShareFloater", 						"OnQuestShareFloater", self)
-	Apollo.RegisterEventHandler("CountdownTick", 							"OnCountdownTick", self)
-	Apollo.RegisterEventHandler("TradeSkillFloater",				 		"OnTradeSkillFloater", self)
-	Apollo.RegisterEventHandler("FactionFloater", 							"OnFactionFloater", self)
-	Apollo.RegisterEventHandler("FloaterTransference", 						"OnFloaterTransference", self)
-	Apollo.RegisterEventHandler("CombatLogCCState", 						"OnCombatLogCCState", self)
-	Apollo.RegisterEventHandler("CombatLogImmunity", 						"OnCombatLogImmunity", self)
-	Apollo.RegisterEventHandler("FloaterMultiHit", 							"OnFloaterMultiHit", self)
-	Apollo.RegisterEventHandler("FloaterMultiHeal", 						"OnFloaterMultiHeal", self)
-	Apollo.RegisterEventHandler("ActionBarNonSpellShortcutAddFailed", 		"OnActionBarNonSpellShortcutAddFailed", self)
-	Apollo.RegisterEventHandler("GenericEvent_GenericError",				"OnGenericError", self)
+	--                          CALLBACK NAME                           ALIASED NAME                           SELF
+	Apollo.RegisterEventHandler("OptionsUpdated_Floaters", 		        "OnOptionsUpdated",                    self)
+	Apollo.RegisterEventHandler("ChannelUpdate_Loot",					"OnChannelUpdate_Loot",                self)
+	Apollo.RegisterEventHandler("SpellCastFailed", 						"OnSpellCastFailed",                   self)
+	Apollo.RegisterEventHandler("DamageOrHealingDone",				 	"OnDamageOrHealing",                   self)
+	Apollo.RegisterEventHandler("CombatMomentum", 						"OnCombatMomentum",                    self)
+	Apollo.RegisterEventHandler("ExperienceGained", 					"OnExperienceGained",                  self)	-- UI_XPChanged ?
+	Apollo.RegisterEventHandler("ElderPointsGained", 					"OnElderPointsGained",                 self)
+	Apollo.RegisterEventHandler("UpdatePathXp", 						"OnPathExperienceGained",              self)
+	Apollo.RegisterEventHandler("AttackMissed", 						"OnMiss",                              self)
+	Apollo.RegisterEventHandler("SubZoneChanged", 						"OnSubZoneChanged",                    self)
+	Apollo.RegisterEventHandler("RealmBroadcastTierMedium", 			"OnRealmBroadcastTierMedium",          self)
+	Apollo.RegisterEventHandler("GenericError", 						"OnGenericError",                      self)
+	Apollo.RegisterEventHandler("PrereqFailureMessage",					"OnPrereqFailed",                      self)
+	Apollo.RegisterEventHandler("GenericFloater", 						"OnGenericFloater",                    self)
+	Apollo.RegisterEventHandler("UnitEvaded", 							"OnUnitEvaded",                        self)
+	Apollo.RegisterEventHandler("QuestShareFloater", 					"OnQuestShareFloater",                 self)
+	Apollo.RegisterEventHandler("CountdownTick", 						"OnCountdownTick",                     self)
+	Apollo.RegisterEventHandler("TradeSkillFloater",			 		"OnTradeSkillFloater",                 self)
+	Apollo.RegisterEventHandler("FactionFloater", 						"OnFactionFloater",                    self) 
+	Apollo.RegisterEventHandler("FloaterTransference", 					"OnFloaterTransference",               self)
+	Apollo.RegisterEventHandler("CombatLogCCState", 					"OnCombatLogCCState",                  self)
+	Apollo.RegisterEventHandler("CombatLogImmunity", 					"OnCombatLogImmunity",                 self)
+	Apollo.RegisterEventHandler("FloaterMultiHit", 						"OnFloaterMultiHit",                   self)
+	Apollo.RegisterEventHandler("FloaterMultiHeal", 					"OnFloaterMultiHeal",                  self)
+	Apollo.RegisterEventHandler("ActionBarNonSpellShortcutAddFailed", 	"OnActionBarNonSpellShortcutAddFailed", self)
+	Apollo.RegisterEventHandler("GenericEvent_GenericError",			"OnGenericError",                      self)
 
 	-- set the max count of floater text
-	CombatFloater.SetMaxFloaterCount(500)
-	CombatFloater.SetMaxFloaterPerUnitCount(500)
+	CombatFloater.SetMaxFloaterCount(200)
+	CombatFloater.SetMaxFloaterPerUnitCount(50)
 
 	-- float text queue for delayed text
 	self.tDelayedFloatTextQueue = Queue:new()
@@ -197,9 +517,12 @@ function IronCombatText:OnLoad()
 	self.tTimerFloatText = {}
 
 	self:OnOptionsUpdated()
+	self:InitPatternTable()
 end
 
+---------------------------------------------------------------------------------------------------
 function IronCombatText:OnOptionsUpdated()
+---------------------------------------------------------------------------------------------------
 	if g_InterfaceOptions and g_InterfaceOptions.Carbine.bSpellErrorMessages ~= nil then
 		self.bSpellErrorMessages = g_InterfaceOptions.Carbine.bSpellErrorMessages
 	else
@@ -207,7 +530,9 @@ function IronCombatText:OnOptionsUpdated()
 	end
 end
 
+---------------------------------------------------------------------------------------------------
 function IronCombatText:GetDefaultTextOption()
+---------------------------------------------------------------------------------------------------
 	local tTextOption =
 	{
 		strFontFace 				= "CRB_FloaterLarge",
@@ -242,6 +567,7 @@ end
 
 ---------------------------------------------------------------------------------------------------
 function IronCombatText:OnSpellCastFailed( eMessageType, eCastResult, unitTarget, unitSource, strMessage )
+---------------------------------------------------------------------------------------------------
 	if unitTarget == nil or not Apollo.GetConsoleVariable("ui.showCombatFloater") then
 		return
 	end
@@ -268,6 +594,7 @@ end
 
 ---------------------------------------------------------------------------------------------------
 function IronCombatText:OnSubZoneChanged(idZone, strZoneName)
+---------------------------------------------------------------------------------------------------
 	-- if you're in a taxi, don't show zone change
 	if GameLib.GetPlayerTaxiUnit() then
 		return
@@ -292,6 +619,7 @@ end
 
 ---------------------------------------------------------------------------------------------------
 function IronCombatText:OnRealmBroadcastTierMedium(strMessage)
+---------------------------------------------------------------------------------------------------
 	local tTextOption = self:GetDefaultTextOption()
 	tTextOption.bUseScreenPos = true
 	tTextOption.fOffset = -180
@@ -311,12 +639,14 @@ end
 
 ---------------------------------------------------------------------------------------------------
 function IronCombatText:OnActionBarNonSpellShortcutAddFailed()
+---------------------------------------------------------------------------------------------------
 	local strMessage = Apollo.GetString("FloatText_ActionBarAddFail")
 	self:OnSpellCastFailed( LuaEnumMessageType.GenericPlayerInvokedError, nil, GameLib.GetControlledUnit(), GameLib.GetControlledUnit(), strMessage )
 end
 
 ---------------------------------------------------------------------------------------------------
 function IronCombatText:OnGenericError(eError, strMessage)
+---------------------------------------------------------------------------------------------------
 	local arExciseListItem =  -- index is enums to respond to, value is optional (UNLOCALIZED) replacement string (otherwise the passed string is used)
 	{
 		[GameLib.CodeEnumGenericError.DbFailure] 						= "",
@@ -353,6 +683,7 @@ end
 
 ---------------------------------------------------------------------------------------------------
 function IronCombatText:OnPrereqFailed(strMessage)
+---------------------------------------------------------------------------------------------------
 	self:OnGenericError(nil, strMessage)
 end
 
@@ -370,6 +701,7 @@ function IronCombatText:OnGenericFloater(unitTarget, strMessage)
 	CombatFloater.ShowTextFloater( unitTarget, strMessage, tTextOption )
 end
 
+---------------------------------------------------------------------------------------------------
 function IronCombatText:OnUnitEvaded(unitSource, unitTarget, eReason, strMessage)
 	local tTextOption = self:GetDefaultTextOption()
 	tTextOption.fScale = 1.0
@@ -458,25 +790,61 @@ function IronCombatText:OnDeath()
 	CombatFloater.ShowTextFloater( GameLib.GetControlledUnit(), Apollo.GetString("Player_Incapacitated"), tTextOption )
 end
 
-
 ---------------------------------------------------------------------------------------------------
 function IronCombatText:OnFloaterMultiHit(tEventArgs)
 	local bCritical = tEventArgs.eCombatResult == GameLib.CodeEnumCombatResult.Critical
 	if tEventArgs.unitCaster == GameLib.GetControlledUnit() then -- Target does the transference to the source
-		self:OnDamageOrHealing( tEventArgs.unitCaster, tEventArgs.unitTarget, tEventArgs.eDamageType, math.abs(tEventArgs.nDamageAmount), math.abs(tEventArgs.nShield), math.abs(tEventArgs.nAbsorption), bCritical, true )
+		self:OnDamageOrHealing( 
+								tEventArgs.unitCaster, 
+								tEventArgs.unitTarget, 
+								tEventArgs.eDamageType, 
+								math.abs(tEventArgs.nDamageAmount), 
+								math.abs(tEventArgs.nShield),
+								math.abs(tEventArgs.nAbsorption),
+								bCritical,
+								tEventArgs.splCallingSpell:GetName(),
+								true 
+							  )
 	else -- creature taking damage
-		self:OnPlayerDamageOrHealing( tEventArgs.unitTarget, tEventArgs.eDamageType, math.abs(tEventArgs.nDamageAmount), math.abs(tEventArgs.nShield), math.abs(tEventArgs.nAbsorption), bCritical, true )
+		self:OnPlayerDamageOrHealing( 
+									  tEventArgs.unitTarget,
+								 	  tEventArgs.eDamageType, 
+									  math.abs(tEventArgs.nDamageAmount), 
+								      math.abs(tEventArgs.nShield),
+								      math.abs(tEventArgs.nAbsorption),
+									  bCritical,
+									  tEventArgs.splCallingSpell:GetName(),
+								      true 
+								    )
 	end
 end
 
 ---------------------------------------------------------------------------------------------------
 function IronCombatText:OnFloaterMultiHeal(tEventArgs)
 	local bCritical = tEventArgs.eCombatResult == GameLib.CodeEnumCombatResult.Critical
-	
 	if tEventArgs.unitTarget == GameLib.GetPlayerUnit() then -- source recieves the transference from the taker
-		self:OnPlayerDamageOrHealing(tEventArgs.unitCaster, GameLib.CodeEnumDamageType.Heal, math.abs(tEventArgs.nHealAmount), 0, 0, bCritical, true )
+		self:OnPlayerDamageOrHealing(
+								      tEventArgs.unitCaster, 
+									  GameLib.CodeEnumDamageType.Heal, 
+									  math.abs(tEventArgs.nHealAmount), 
+									  0, 
+									  0,
+									  bCritical,
+									  tEventArgs.splCallingSpell:GetName(), 
+									  true 
+									)
 	else
-		self:OnDamageOrHealing(tEventArgs.unitCaster, tEventArgs.unitTarget, GameLib.CodeEnumDamageType.Heal, math.abs(tEventArgs.nHealAmount), 0, 0, bCritical, true )
+		self:OnDamageOrHealing( 
+		                        tEventArgs.unitCaster, 
+		                        tEventArgs.unitTarget, 
+								GameLib.CodeEnumDamageType.Heal, 
+								math.abs(tEventArgs.nHealAmount), 
+								0, 
+								0, 
+								bCritical, 
+								tEventArgs.splCallingSpell:GetName(), 
+								true 
+							  )
 	end
 end
 
@@ -484,18 +852,51 @@ end
 function IronCombatText:OnFloaterTransference(tEventArgs)
 	local bCritical = tEventArgs.eCombatResult == GameLib.CodeEnumCombatResult.Critical
 	if tEventArgs.unitCaster == GameLib.GetControlledUnit() then -- Target does the transference to the source
-		self:OnDamageOrHealing( tEventArgs.unitCaster, tEventArgs.unitTarget, tEventArgs.eDamageType, math.abs(tEventArgs.nDamageAmount), math.abs(tEventArgs.nShield), math.abs(tEventArgs.nAbsorption), bCritical, true )
+		self:OnDamageOrHealing( tEventArgs.unitCaster, 
+								tEventArgs.unitTarget, 
+								tEventArgs.eDamageType, 
+								math.abs(tEventArgs.nDamageAmount), 
+								math.abs(tEventArgs.nShield), 
+								math.abs(tEventArgs.nAbsorption),
+								"FloaterTransference", 
+								bCritical,
+								false )
 	else -- creature taking damage
-		self:OnPlayerDamageOrHealing( tEventArgs.unitTarget, tEventArgs.eDamageType, math.abs(tEventArgs.nDamageAmount), math.abs(tEventArgs.nShield), math.abs(tEventArgs.nAbsorption), bCritical, true )
+		self:OnPlayerDamageOrHealing( 
+		tEventArgs.unitTarget, 
+		tEventArgs.eDamageType, 
+		math.abs(tEventArgs.nDamageAmount),
+		math.abs(tEventArgs.nShield), 
+		math.abs(tEventArgs.nAbsorption), 
+		bCritical, 
+		"FloaterTransference", 
+		false )
 	end
 
 	-- healing data is stored in a table where each subtable contains a different vital that was healed
 	-- units in caster's group can get healed
 	for idx, tHeal in ipairs(tEventArgs.tHealData) do
 		if tHeal.unitHealed == GameLib.GetPlayerUnit() then -- source recieves the transference from the taker
-			self:OnPlayerDamageOrHealing(tEventArgs.unitCaster, GameLib.CodeEnumDamageType.Heal, math.abs(tHeal.nHealAmount), 0, 0, bCritical, true )
+			self:OnPlayerDamageOrHealing(
+			tEventArgs.unitCaster, 
+			GameLib.CodeEnumDamageType.Heal, 
+			math.abs(tHeal.nHealAmount), 
+			0, 
+			0, 
+			bCritical,
+		    "FloaterTransference", 
+		    false )
 		else
-			self:OnDamageOrHealing(tEventArgs.unitCaster, tHeal.unitHealed, tEventArgs.eDamageType, math.abs(tHeal.nHealAmount), 0, 0, bCritical, true )
+			self:OnDamageOrHealing( 
+			tEventArgs.unitCaster, 
+			tHeal.unitHealed, 
+			tEventArgs.eDamageType, 
+			math.abs(tHeal.nHealAmount), 
+			0, 
+			0, 
+			bCritical, 
+			"FloaterTransference", 
+			false )
 		end
 	end
 end
@@ -842,13 +1243,17 @@ end
 ------------------------------------------------------------------------------------------------------------------------------
 function IronCombatText:OnOutgoingHealing( unitCaster, unitTarget, eDamageType, nDamage, nShieldDamage, nAbsorp, bCritical, bMultiHit)
 -----------------------------------------------------------------------------------------------------------------------------
+	if (nDamage + nShieldDamage) < self.tSettings.iHealOutThreshold then
+		return
+	end
+	
 	local tTextOption = self:GetDefaultTextOption()
 	
-	local nBaseColor = self.tSettings.cHealDefault
-	local fMaxSize = self.tSettings.fHealOutNormalScale
-	local fMaxDuration = 1.25
-	local fBigCritScale = 1.0
-	local nTotalDamage = nDamage + nShieldDamage
+	local nBaseColor     = self.tSettings.cHealDefault
+	local fMaxSize       = self.tSettings.fHealOutNormalScale
+	local fMaxDuration   = 1.25
+	local fBigCritScale  = 1.0
+	local nTotalDamage   = nDamage + nShieldDamage
 	
 	if bCritical == true then -- Crit not vuln
 		nBaseColor = self.tSettings.cHealCrit
@@ -862,18 +1267,33 @@ function IronCombatText:OnOutgoingHealing( unitCaster, unitTarget, eDamageType, 
 	if eDamageType == GameLib.CodeEnumDamageType.HealShields then -- healing shields params
 		nBaseColor = self.tSettings.cHealShield
 	end
+	
+	if bMultiHit ~= nil and bMultiHit == true then
+	  nBaseColor = self.tSettings.cHealMultiHit
+	end
+		
+	tTextOption = self.patternTable[self.tSettings.nHealOutPattern]
+	{
+		strFontFace  = self.tSettings.nHealOutFont,
+		eLocation  	 = self.tSettings.nHealOutPos,
+		eCollisionMode   = self.tSettings.nHealOutCollision,
+		fMaxSize 	 = fMaxSize,
+		fBigScale  	 = fBigCritScale,
+		fMaxDuration = fMaxDuration,
+		nBaseColor   = nBaseColor
+	}
+	
+	--tTextOption = self.patternTable[self.tSettings.nHealOutPattern](self.tSettings.nHealOutFont, self.tSettings.nHealOutPos, fMaxSize, fBigCritScale, fMaxDuration, nBaseColor)
 
+
+	--[[
 	-- set offset
 	tTextOption.strFontFace = self.tSettings.nHealOutFont
 	tTextOption.fOffsetDirection = 220
 	tTextOption.fOffset = 3
 	tTextOption.bShowOnTop = true
 	
-	if bMultiHit and bMultiHit == true and self.tSettings.bShowMultiHit == true then
-	  nBaseColor = self.tSettings.cHealMultiHit
-	  tTextOption.fOffset = 5
-	  tTextOption.fOffsetDirection = 250
-	end
+
 	
 	-- scale and movement
 	-- Default movement:
@@ -892,6 +1312,7 @@ function IronCombatText:OnOutgoingHealing( unitCaster, unitTarget, eDamageType, 
 		[5] = {fScale = fMaxSize * fBigCritScale,	fTime = .75,		fVelocityDirection = 30,  fVelocityMagnitude = 5,	fAlpha = 0.65,			  	  },
 		[6] = {										fTime = fMaxDuration,													fAlpha = 0.0,					  },
 	}
+	--]]
 
 	if type(nAbsorptionAmount) == "number" and nAbsorptionAmount > 0 then -- secondary "if" so we don't see absorption and "0"
 		CombatFloater.ShowTextFloater( unitTarget, String_GetWeaselString(Apollo.GetString("FloatText_Absorbed"), nAbsorptionAmount), tTextOptionAbsorb )
@@ -903,24 +1324,22 @@ end
 ------------------------------------------------------------------------------------------------------------------------------
 -- Helper function for displaying damage
 ------------------------------------------------------------------------------------------------------------------------------
-function IronCombatText:OnOutgoingDamage( unitCaster, unitTarget, nDamage, nShieldDamage, nAbsorp, bCritical, bMultiHit)
------------------------------------------------------------------------------------------------------------------------------
-	local tTextOption = self:GetDefaultTextOption()
-	
+function IronCombatText:OnOutgoingDamage( unitCaster, unitTarget, nDamage, nShieldDamage, nAbsorb, bCritical, bMultiHit)
+-----------------------------------------------------------------------------------------------------------------------------	
+	-- Don't do anything if under damage threshold
+	if (nDamage + nShieldDamage) < self.tSettings.iDmgOutThreshold then
+		return
+	end
+
+	local tTextOption 	= self:GetDefaultTextOption()
+	local nTotalDamage 	= nDamage + nShieldDamage
 	local nBaseColor 	= self.tSettings.cDmgDefault
 	local fMaxSize 		= self.tSettings.fDmgOutNormalScale
-	local fMaxDuration 	= 1.25
 	local fCritScale 	= self.tSettings.fDmgOutCritScale
+	local fMaxDuration 	= self.tSettings.fDmgOutDuration
 	local fBigDmgScale 	= 1.0
-	local nTotalDamage 	= nDamage + nShieldDamage
+	local bIsAbsorb     = false
 	
-	tTextOption.strFontFace = self.tSettings.nDmgOutFont
-	tTextOption.eCollisionMode = CombatFloater.CodeEnumFloaterCollisionMode.IgnoreCollision
-	tTextOption.eLocation = CombatFloater.CodeEnumFloaterLocation.Chest
-	tTextOption.fOffsetDirection = 220 -- 5 o'clock
-	tTextOption.fOffset = 3
-	tTextOption.bShowOnTop = true
-
 	-- Change color and scale for crit
 	if bCritical == true then 
 		nBaseColor = self.tSettings.cDmgCrit
@@ -928,6 +1347,7 @@ function IronCombatText:OnOutgoingDamage( unitCaster, unitTarget, nDamage, nShie
 		
 		if nTotalDamage >= self.tSettings.iDmgBigCritOutValue then
 			fBigDmgScale = 1.25
+			fMaxDuration = fMaxDuration * 1.4
 		end
 	end
 	
@@ -937,61 +1357,42 @@ function IronCombatText:OnOutgoingDamage( unitCaster, unitTarget, nDamage, nShie
 	end 
 	
 	-- Change color and position for multi-hit
-	if bMultiHit and bMultiHit == true and self.tSettings.bShowMultiHit == true then
-	  --nBaseColor = 0x0088ff
+	if bMultiHit and bMultiHit == true then
 	  nBaseColor = self.tSettings.cDmgMultiHit
-	  tTextOption.fOffset = 5
-	  tTextOption.fOffsetDirection = 250
 	end
 	
-	if type(nAbsorp) == "number" and nAbsorp > 0 then
-		nBaseColor = 0xffffff
+	if type(nAbsorb) == "number" and nAbsorb > 0 then
+		if self.tSettings.bDmgOutShowAbsorb == true then
+			bIsAbsorb = true
+			nBaseColor = self.tSettings.cDmgAbsorb
+		end
+		nTotalDamage = nTotalDamage + nAbsorb
 	end
 	
-	-- scale and movement
-	-- Default movement:
-	-- t5             123
-	-- t4              123
-	-- t3               123
-	-- t2              123
-	-- t1              123
-	-- t0            123
-	tTextOption.arFrames =
+	tTextOption = self.patternTable[self.tSettings.nDmgOutPattern]
 	{
-		[1] = {fScale = fMaxSize * 0.8,	        	fTime = 0,			fVelocityDirection = -45, fVelocityMagnitude = 5,						nColor = nBaseColor,	},
-		[2] = {fScale = fMaxSize,					fTime = .15,		fVelocityDirection = -30, fVelocityMagnitude = 5,	fAlpha = 1.0,							},
-		[3] = {fScale = fMaxSize * fBigDmgScale,	fTime = .30,		fVelocityDirection = -15, fVelocityMagnitude = 5,						nColor = nBaseColor,	},
-		[4] = {fScale = fMaxSize,					fTime = .45,		fVelocityDirection = 15,  fVelocityMagnitude = 5,	fAlpha = 0.85,						},
-		[5] = {fScale = fMaxSize * fBigDmgScale,	fTime = .75,		fVelocityDirection = 30,  fVelocityMagnitude = 5,	fAlpha = 0.65,						},
-		[6] = {										fTime = fMaxDuration,													fAlpha = 0.0,							},
+		strFontFace     = self.tSettings.nDmgOutFont,
+		eLocation  	    = self.tSettings.nDmgOutPos,
+		eCollisionMode  = self.tSettings.nDmgOutCollision,
+		fMaxSize 	    = fMaxSize,
+		fBigScale  	    = fBigDmgScale,
+		fMaxDuration    = fMaxDuration,
+		nBaseColor      = nBaseColor
 	}
 	
-	--[[ 
 	
-	Default options
-	
-	tTextOption.fOffsetDirection = nOffset
-	tTextOption.fOffset = math.random(10, 80)/100
-	tTextOption.arFrames =
-	{
-		[1] = {fScale = (fMaxSize) * 1.75,	fTime = 0,									nColor = 0xffffff,	},
-		[2] = {fScale = fMaxSize,			fTime = .15,			fAlpha = 1.0,},                         },
-		[3] = {fScale = fMaxSize,			fTime = .3,									nColor = nBaseColor,},
-		[4] = {fScale = fMaxSize,			fTime = .5,				fAlpha = 1.0,},
-		[5] = {								fTime = fMaxDuration,	fAlpha = 0.0,},
-	}
-	--]]
-	
-	if type(nAbsorp) == "number" and nAbsorp > 0 then
-		
-		CombatFloater.ShowTextFloater( unitTarget, String_GetWeaselString(Apollo.GetString("FloatText_Absorbed"), nAbsorp), tTextOption )
+	if bIsAbsorb == true then
+		CombatFloater.ShowTextFloater( unitTarget, String_GetWeaselString(Apollo.GetString("FloatText_Absorbed"), nAbsorb), tTextOption )
+	elseif self.tSettings.bDmgOutMergeShield == false then
+		CombatFloater.ShowTextFloater( unitTarget, nDamage, nShieldDamage, tTextOption )
 	else
 		CombatFloater.ShowTextFloater( unitTarget, nTotalDamage, 0, tTextOption )
 	end
+	
 end
 
 ------------------------------------------------------------------------------------------------------------------------------
-function IronCombatText:OnDamageOrHealing( unitCaster, unitTarget, eDamageType, nDamage, nShieldDamaged, nAbsorptionAmount, bCritical, bMultiHit)
+function IronCombatText:OnDamageOrHealing( unitCaster, unitTarget, eDamageType, nDamage, nShieldDamaged, nAbsorptionAmount, bCritical, strName, bMultiHit)
 ------------------------------------------------------------------------------------------------------------------------------
 	if unitTarget == nil or not Apollo.GetConsoleVariable("ui.showCombatFloater") or nDamage == nil then
 		return
@@ -1002,6 +1403,7 @@ function IronCombatText:OnDamageOrHealing( unitCaster, unitTarget, eDamageType, 
 		return
 	end
 	
+	
 	if eDamageType == GameLib.CodeEnumDamageType.Heal or eDamageType == GameLib.CodeEnumDamageType.HealShields then
 		self:OnOutgoingHealing(unitCaster, unitTarget, eDamageType, nDamage, nShieldDamaged, nAbsorptionAmount, bCritical, bMultiHit)
 		return
@@ -1011,6 +1413,7 @@ function IronCombatText:OnDamageOrHealing( unitCaster, unitTarget, eDamageType, 
 	end
 	
 end
+
 
 ------------------------------------------------------------------
 function IronCombatText:OnIncomingDamage( unitPlayer, eDamageType, nDamage, nShieldDamage, nAbsorb, bCritical )
@@ -1041,24 +1444,19 @@ function IronCombatText:OnIncomingDamage( unitPlayer, eDamageType, nDamage, nShi
 	if type(nAbsorb) == "number" and nAbsorb > 0 then
 		nBaseColor = self.tSettings.cDmgInAbsorb
 	end
-
-	-- scale and movement
-	-- Default movement:
-	-- t5             123
-	-- t4              123
-	-- t3               123
-	-- t2              123
-	-- t1              123
-	-- t0            123
-	tTextOption.arFrames =
+	
+	tTextOption = self.patternTable[self.tSettings.nDmgInPattern]
 	{
-		[1] = {fScale = fMaxSize * 0.8,	        fTime = 0,			fVelocityDirection = 180, fVelocityMagnitude = 5,	fAlpha = 1.0, nColor = nBaseColor,},
-		[2] = {fScale = fMaxSize,				fTime = .15,		fVelocityDirection = 180, fVelocityMagnitude = 5,	fAlpha = 1.0,},
-		[3] = {fScale = fMaxSize * fBigCritScale,	fTime = .30,		fVelocityDirection = 180, fVelocityMagnitude = 5,	nColor = nBaseColor,},
-		[4] = {fScale = fMaxSize,				fTime = .45,		fVelocityDirection = 180,  fVelocityMagnitude = 5,	fAlpha = 0.85,},
-		[5] = {fScale = fMaxSize * fBigCritScale,	fTime = .75,		fVelocityDirection = 180,  fVelocityMagnitude = 5,	fAlpha = 0.65,},
-		[6] = {									fTime = fMaxDuration,													fAlpha = 0.0,},
+		strFontFace  = self.tSettings.nDmgInFont,
+		eLocation  	 = self.tSettings.nDmgInPos,
+		eCollisionMode   = self.tSettings.nDmgInCollision,
+		fMaxSize 	 = fMaxSize,
+		fBigScale  	 = fBigCritScale,
+		fMaxDuration = fMaxDuration,
+		nBaseColor   = nBaseColor
 	}
+	
+	--tTextOption = self.patternTable[self.tSettings.nDmgInPattern](self.tSettings.nDmgInFont, self.tSettings.nDmgInPos, fMaxSize, fBigCritScale, fMaxDuration, nBaseColor)
 
 	if type(nAbsorb) == "number" and nAbsorb > 0 then
 		CombatFloater.ShowTextFloater( unitPlayer, String_GetWeaselString(Apollo.GetString("FloatText_Absorbed"), nAbsorb), tTextOption )
@@ -1071,6 +1469,10 @@ end
 
 ------------------------------------------------------------------
 function IronCombatText:OnIncomingHealing( unitPlayer, eDamageType, nDamage, nShieldDamage, nAbsorb, bCritical )
+	if (nDamage + nShieldDamage) < self.tSettings.iHealInThreshold then
+		return
+	end
+	
 	local tTextOption = self:GetDefaultTextOption()
 	
 	local nBaseColor 	= self.tSettings.cHealInDefault
@@ -1091,30 +1493,19 @@ function IronCombatText:OnIncomingHealing( unitPlayer, eDamageType, nDamage, nSh
 	if eDamageType == GameLib.CodeEnumDamageType.HealShields then -- healing shields params
 		nBaseColor = self.tSettings.cHealInShield
 	end
-
-	-- set offset
-	tTextOption.strFontFace 	 = self.tSettings.nHealInFont
-	tTextOption.fOffsetDirection = 220
-	tTextOption.fOffset 		 = 3
-	tTextOption.bShowOnTop       = true
 	
-	-- scale and movement
-	-- Default movement:
-	-- t5             123
-	-- t4              123
-	-- t3               123
-	-- t2              123
-	-- t1              123
-	-- t0            123
-	tTextOption.arFrames =
+	tTextOption = self.patternTable[self.tSettings.nHealInPattern]
 	{
-		[1] = {fScale = fMaxSize * 0.8,	        	fTime = 0,			fVelocityDirection = -45, fVelocityMagnitude = 5,					nColor = nBaseColor,},
-		[2] = {fScale = fMaxSize,					fTime = .15,		fVelocityDirection = -30, fVelocityMagnitude = 5,	fAlpha = 1.0, 	nColor = nBaseColor,},
-		[3] = {fScale = fMaxSize * fBigCritScale,	fTime = .30,		fVelocityDirection = -15, fVelocityMagnitude = 5,					nColor = nBaseColor,},
-		[4] = {fScale = fMaxSize,					fTime = .45,		fVelocityDirection = 15,  fVelocityMagnitude = 5,	fAlpha = 0.85,				  },
-		[5] = {fScale = fMaxSize * fBigCritScale,	fTime = .75,		fVelocityDirection = 30,  fVelocityMagnitude = 5,	fAlpha = 0.65,			  	  },
-		[6] = {										fTime = fMaxDuration,													fAlpha = 0.0,					  },
+		strFontFace  = self.tSettings.nHealInFont,
+		eLocation  	 = self.tSettings.nHealInPos,
+		eCollisionMode   = self.tSettings.nHealInCollision,
+		fMaxSize 	 = fMaxSize,
+		fBigScale  	 = fBigCritScale,
+		fMaxDuration = fMaxDuration,
+		nBaseColor   = nBaseColor
 	}
+	
+	--tTextOption = self.patternTable[self.tSettings.nHealInPattern](self.tSettings.nHealInFont, self.tSettings.nHealInPos, fMaxSize, fBigCritScale, fMaxDuration, nBaseColor)
 
 	if type(nAbsorptionAmount) == "number" and nAbsorptionAmount > 0 then -- secondary "if" so we don't see absorption and "0"
 		CombatFloater.ShowTextFloater( unitPlayer, String_GetWeaselString(Apollo.GetString("FloatText_Absorbed"), nAbsorptionAmount), tTextOption )
@@ -1126,7 +1517,7 @@ function IronCombatText:OnIncomingHealing( unitPlayer, eDamageType, nDamage, nSh
 end
 
 ------------------------------------------------------------------
-function IronCombatText:OnPlayerDamageOrHealing(unitPlayer, eDamageType, nDamage, nShieldDamaged, nAbsorptionAmount, bCritical)
+function IronCombatText:OnPlayerDamageOrHealing(unitPlayer, eDamageType, nDamage, nShieldDamaged, nAbsorptionAmount, bCritical, strSpellName)
 	if unitPlayer == nil or not Apollo.GetConsoleVariable("ui.showCombatFloater") then
 		return
 	end
@@ -1144,6 +1535,7 @@ function IronCombatText:OnPlayerDamageOrHealing(unitPlayer, eDamageType, nDamage
 		return
 	end
 
+	--[[
 	local bShowFloater = true
 	local tTextOption = self:GetDefaultTextOption()
 	local tTextOptionAbsorb = self:GetDefaultTextOption()
@@ -1237,6 +1629,7 @@ function IronCombatText:OnPlayerDamageOrHealing(unitPlayer, eDamageType, nDamage
 	elseif not bHeal then
 		CombatFloater.ShowTextFloater( unitPlayer, nDamage, nShieldDamaged, tTextOption )
 	end
+	--]]
 end
 
 ------------------------------------------------------------------
@@ -1511,9 +1904,6 @@ function IronCombatText:OnDelayedFloatTextTimer()
 	Event_FireGenericEvent("Float_RequestShowTextFloater", tParams.eMessageType, tParams, tParams.tContent) -- TODO: Event!!!!
 end
 
----------------------------------------------------------------------------------------------------
--- OptionsInHeal Functions
----------------------------------------------------------------------------------------------------
 
 local IronCombatTextInst = IronCombatText:new()
 IronCombatTextInst:Init()

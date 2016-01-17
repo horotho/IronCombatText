@@ -1,8 +1,9 @@
-<Addon Name="IronCombatText" Version="1" Author="Iron Oxide" APIVersion="11" Description="Replaces floating text.">
+<Addon Name="IronCombatText" Version="1" Author="Iron Oxide" APIVersion="12" Description="Replaces floating text.">
     <Script Name="IronCombatText.lua"/>
 	<Script Name="Options.lua"/>
 	<Script Name="Utils.lua"/>
     <Script Name="IronCombatTextPanel.lua"/>
+    <Script Name="Patterns.lua"/>
     <Form Name="IronCombatTextPanel.xml"/>
 	<Form Name="OptionsPanel.xml"/>
     <ReplaceAddon Name="FloatText"/>

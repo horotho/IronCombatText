@@ -1,8 +1,28 @@
 require "CombatFloater"
+require "ChatSystemLib"
 
 local Options = {}
-local IronCombatText = Apollo.GetAddon("IronCombatText")
+local IronCombatText  = Apollo.GetAddon("IronCombatText")
 
+-----------------------------------------------------------------------------------------------
+-- Constants
+-----------------------------------------------------------------------------------------------
+local k_InitColor 	  = "InitColorWidget"
+local k_InitPattern   = "InitPatternWidget"
+local k_InitFont      = "InitFontWidget"
+local k_InitCollision = "InitCollisionWidget"
+local k_InitPosition  = "InitPositionWidget"
+local k_InitSlider	  = "InitSliderWidget"
+local k_InitValue	  = "InitValueWidget"
+local k_InitOptionBox = "InitOptionBoxWidget"
+
+
+-- Testing
+local k_InitComboBox = "InitComboBox"
+
+-----------------------------------------------------------------------------------------------
+-- Constant Tables
+-----------------------------------------------------------------------------------------------
 local fontList = 
 {
   "CRB_FloaterLarge",
@@ -37,9 +57,9 @@ local posLookup =
 
 local collisionList = 
 {
+	"Ignore",
 	"Horizontal",
-	"Vertical",
-	"Ignore"
+	"Vertical"
 }
 
 local collisionLookup = 
@@ -58,9 +78,9 @@ local patternList =
   "StreamDownRight",
   "StreamDownLeft",
   "StraightUp",
-  "StraightDown"
+  "StraightDown",
+  "Test"
 }
-
 
 -----------------------------------------------------------------------------------------------
 -- Init Function
@@ -71,17 +91,32 @@ function Options:Init(parent)
 	Apollo.RegisterSlashCommand("ict", "OnInvokeOptions", self)
 	Apollo.RegisterSlashCommand("ironcombattext", "OnInvokeOptions", self)
 	Apollo.RegisterSlashCommand("icbt", "OnInvokeOptions", self)
-	
-	self.initFunctions = {
+
+	-- Function table for category init
+	self.initFunctions = 
+	{
 		OutDmg  = function() self:InitOutDmg()  end,
 		InDmg   = function() self:InitInDmg()   end,
 		InHeal  = function() self:InitInHeal()  end,
 		OutHeal = function() self:InitOutHeal() end,
 		General = function() self:InitGeneral() end,
 	}
+
+	-- Function table for widget init
+	self.widgetFunctions = 
+	{
+		[k_InitColor]		= function(...) return self:InitColorWidget(...) 		end,
+		[k_InitPattern] 	= function(...) return self:InitPatternWidget(...) 		end,
+		[k_InitFont]		= function(...) return self:InitFontWidget(...) 		end,
+		[k_InitCollision] 	= function(...) return self:InitCollisionWidget(...) 	end,
+		[k_InitPosition] 	= function(...) return self:InitPositionWidget(...) 	end,
+		[k_InitSlider] 		= function(...) return self:InitSliderWidget(...) 		end,
+		[k_InitValue]		= function(...) return self:InitValueWidget(...) 		end,
+		[k_InitOptionBox]	= function(...) return self:InitOptionBoxWidget(...) 	end,
+
+	}
 	
 	self.parent = parent
-	self.currentCategory = "OutHeal"
 	self.xmlDoc = XmlDoc.CreateFromFile("OptionsPanel.xml")
 	self.xmlDoc:RegisterCallback("OnDocLoaded", self)
 end
@@ -100,6 +135,7 @@ function Options:OnDocLoaded()
 		
 	    self.wndMain:Show(false, true)
 		self.content = self.wndMain:FindChild("Content")
+		self:LoadCategory(self.parent.tSettings.currentCategory)
 		 
 	else
 		Apollo.AddAddonErrorText(self, "Could not load the xml doc for some reason.")
@@ -112,7 +148,7 @@ end
 function Options:OnInvokeOptions()
 -----------------------------------------------------------------------------------------------
 	self.wndMain:Invoke()
-	self:LoadCategory(self.currentCategory)
+	self:LoadCategory(self.parent.tSettings.currentCategory)
 end
 
 
@@ -125,143 +161,85 @@ function Options:LoadCategory(categoryName)
 	self.currentButton:SetCheck(true)
 	self.content:DestroyChildren()
 	self.options = Apollo.LoadForm(self.xmlDoc, "BaseCategory", self.content, self)
+	self.parent.tSettings.currentCategory = categoryName
+	self.currentCategory = categoryName
 	
 	-- Global variables that are easy to re-init here and add later
 	self.colorPreviews = {}
 	self.textWidgets   = {}
+	self.textParams    = {}
+	self.totalSize 	   = 0
 	
 	if self.options then
 		self.initFunctions[categoryName]()
 	else
 		Apollo.AddAddonErrorText(self, "Unable to load category ".. categoryName)
 	end
-
 end
 
 -----------------------------------------------------------------------------------------------
 function Options:InitInHeal()
 -----------------------------------------------------------------------------------------------
-	local totalHeight    = 0
-	local fontName       = "nHealInFont"
-	local positionName   = "nHealInPos"
-	local patternName    = "nHealInPattern"
-	local collisionName  = "nHealInCollision"
-	
-	-- Load Color Widgets
-	local content = self:LoadCategoryWidget(self.options, "Color", { top = -2, itemHeight = 70, numItems = 3, padding = 30 })
-	totalHeight = totalHeight + content.Size
-	self:InitColorWidget(content.Widget, "cHealInDefault",  "Normal",    fontName)
-	self:InitColorWidget(content.Widget, "cHealInCrit",     "Critical",  fontName)
-	self:InitColorWidget(content.Widget, "cHealInShield",   "Shield Heal",    fontName)
-	content.Widget:ArrangeChildrenVert(Window.CodeEnumArrangeOrigin.Middle)
+	local fontName = "nHealInFont"
 
-	-- Load Text Widgets
-	content = self:LoadCategoryWidget(self.options, "Text", { top = totalHeight, itemHeight = 70, numItems = 4, padding = 30 })
-	totalHeight = totalHeight + content.Size
-	self:InitFontWidget    (content.Widget, fontName, colorPreviews)
-	self:InitPositionWidget(content.Widget, positionName)
-	self:InitPatternWidget (content.Widget, patternName)
-	self:InitCollisionWidget(content.Widget, collisionName)
-	content.Widget:ArrangeChildrenVert(Window.CodeEnumArrangeOrigin.Middle)
-	
-	-- Load Scale Widgets
-	content = self:LoadCategoryWidget(self.options, "Scale", { top = totalHeight, itemHeight = 70, numItems = 2, padding = 30 })
-	totalHeight = totalHeight + content.Size
-	self:InitSliderWidget(content.Widget, "fHealInNormalScale", "Normal Scale")
-	self:InitSliderWidget(content.Widget, "fHealInCritScale",   "Critical Scale")
-	content.Widget:ArrangeChildrenVert(Window.CodeEnumArrangeOrigin.Middle)
-	
-	content = self:LoadCategoryWidget(self.options, "Other", { top = totalHeight, itemHeight = 65, numItems = 1, padding = 30})
-	totalHeight = totalHeight + content.Size
-	self:InitValueWidget(content.Widget, "iHealInThreshold", "Don't show any healing under this threshold")
-	content.Widget:ArrangeChildrenVert(Window.CodeEnumArrangeOrigin.Middle)
-	
-	self.options:ArrangeChildrenTiles(0)
+	self:LoadSubCategory(self.options, 
+	{ 
+		Color = 
+			   { 
+				{k_InitColor, "cHealInDefault",  "Normal",       fontName}, 
+				{k_InitColor, "cHealInCrit",     "Critical",     fontName},
+				{k_InitColor, "cHealInShield", 	 "Shield Heal",  fontName},
+			   },  
+		Text = 
+			   { 
+				{k_InitFont, 	  fontName}, 
+				{k_InitPosition,  "nHealInPos"}, 
+				{k_InitPattern,   "nHealInPattern"},
+				{k_InitCollision, "nHealInCollision"}
+			   }, 
+  		Other = 
+			   { 
+				{k_InitValue,  "iHealInThreshold",    "Don't show any damage under this threshold"},
+			   },
+		Scale = 
+			   { 
+				{k_InitSlider, "fHealInNormalScale", "Normal Scale"}, 
+				{k_InitSlider, "fHealInCritScale",   "Critical Scale"},
+			   }, 
+	})
 end
-
 
 -----------------------------------------------------------------------------------------------
 function Options:InitOutHeal()
 -----------------------------------------------------------------------------------------------
-	local totalHeight = 0
-	local fontName    = "nHealOutFont"
+	local fontName = "nHealOutFont"
 	
-	local content = self:LoadCategoryWidget(self.options, "Color", { top = -2, itemHeight = 70, numItems = 4, padding = 30 })
-	totalHeight = totalHeight + content.Size
-	self:InitColorWidget(content.Widget, "cHealDefault",   "Normal",      fontName)
-	self:InitColorWidget(content.Widget, "cHealCrit",      "Critical",    fontName)
-	self:InitColorWidget(content.Widget, "cHealMultiHit",  "Multi Hit",   fontName)
-	self:InitColorWidget(content.Widget, "cHealShield",    "Shield Heal", fontName)
-	content.Widget:ArrangeChildrenVert(Window.CodeEnumArrangeOrigin.Middle)
-	
-	-- Init text widgets
-	content = self:LoadCategoryWidget(self.options, "Text", { top = totalHeight, itemHeight = 70, numItems = 4, padding = 30 })
-	totalHeight = totalHeight + content.Size
-	self:InitFontWidget    (content.Widget, fontName, colorPreviews)
-	self:InitPositionWidget(content.Widget, "nHealOutPos")
-	self:InitPatternWidget (content.Widget, "nHealOutPattern")
-	self:InitCollisionWidget(content.Widget, "nHealOutCollision")
-	content.Widget:ArrangeChildrenVert(Window.CodeEnumArrangeOrigin.Middle)
-
-	
-	content = self:LoadCategoryWidget(self.options, "Scale", { top = totalHeight, itemHeight = 70, numItems = 2, padding = 30 })
-	totalHeight = totalHeight + content.Size
-	self:InitSliderWidget(content.Widget, "fHealOutNormalScale", "Normal Scale")
-	self:InitSliderWidget(content.Widget, "fHealOutCritScale",   "Critical Scale")
-	content.Widget:ArrangeChildrenVert(Window.CodeEnumArrangeOrigin.Middle)
-	
-	content = self:LoadCategoryWidget(self.options, "Other", { top = totalHeight, itemHeight = 65, numItems = 1, padding = 30})
-	totalHeight = totalHeight + content.Size
-	self:InitValueWidget(content.Widget, "iHealOutThreshold", "Don't show any healing under this threshold")
-	content.Widget:ArrangeChildrenVert(Window.CodeEnumArrangeOrigin.Middle)
-
-
-	self.options:ArrangeChildrenTiles(0)
-	
-	--[[
-	self.bigCritValue    = self.options:FindChild("BigCrit")
-	self.fontList        = self.options:FindChild("FontList")
-	self.fontButton      = self.options:FindChild("FontButton")
-	self.posButton       = self.options:FindChild("PosButton")
-	self.posList         = self.options:FindChild("PosList")
-	self.font            = self.parent.tSettings.nHealOutFont
-	
-	-- Scale
-	self.normalScale 	 = self.options:FindChild("NormScale")
-	self.normalScalePrev = self.options:FindChild("NormScalePrev")
-	self.critScale 		 = self.options:FindChild("CritScale")
-	self.critScalePrev   = self.options:FindChild("CritScalePrev")
-	
-	self:InitScaleWidget{
-		slider  = self.critScale,
-		preview = self.critScalePrev,
-		value = self.parent.tSettings.fHealOutCritScale,
-		callback = function(value, formattedValue)
-			self.parent.tSettings.fHealOutCritScale = value
-			self.critScalePrev:SetText(formattedValue)
-		end
-	}
-	
-	self:InitScaleWidget{
-		slider = self.normalScale,
-		preview = self.normalScalePrev,
-		value = self.parent.tSettings.fHealOutNormalScale,
-		callback = function(value, formattedValue)
-			self.parent.tSettings.fHealOutNormalScale = value
-			self.normalScalePrev:SetText(formattedValue)
-		end
-	
-	}
-	
-	self:InitValueWidget{
-		editBox = self.bigCritValue,
-		value = ("%05d"):format(self.parent.tSettings.iHealBigCritValue),
-		callback = function(value)
-			self.parent.tSettings.iHealBigCritValue = tonumber(value)
-		end
-	}
-	--]]
-
+	self:LoadSubCategory(self.options, 
+	{ 
+		Color = 
+			   { 
+				{k_InitColor, "cHealDefault",  "Normal",       fontName}, 
+				{k_InitColor, "cHealCrit",     "Critical",     fontName},
+				{k_InitColor, "cHealMultiHit", "Multi Hit",    fontName},
+				{k_InitColor, "cHealShield",   "Shield Heal",  fontName}, 
+			   },  
+		Text = 
+			   { 
+				{k_InitFont, 	  fontName}, 
+				{k_InitPosition,  "nHealOutPos"}, 
+				{k_InitPattern,   "nHealOutPattern"},
+				{k_InitCollision, "nHealOutCollision"}
+			   }, 
+  		Other = 
+			   { 
+				{k_InitValue,  "iHealOutThreshold",    "Don't show any damage under this threshold"},
+			   },
+		Scale = 
+			   { 
+				{k_InitSlider, "fHealOutNormalScale", "Normal Scale"}, 
+				{k_InitSlider, "fHealOutCritScale",   "Critical Scale"},
+			   }, 
+	})
 end
 
 -----------------------------------------------------------------------------------------------
@@ -272,46 +250,39 @@ function Options:InitOutDmg()
 	local positionName   = "nDmgOutPos"
 	local patternName    = "nDmgOutPattern"
 	local collisionName  = "nDmgOutCollision"
-	
-	-- Load Color Widgets
-	local content = self:LoadCategoryWidget(self.options, "Color", { top = -2, itemHeight = 65, numItems = 5, padding = 30 })
-	totalHeight = totalHeight + content.Size
-	self:InitColorWidget(content.Widget, "cDmgDefault",  "Normal",        fontName)
-	self:InitColorWidget(content.Widget, "cDmgCrit",     "Critical",      fontName)
-	self:InitColorWidget(content.Widget, "cDmgMultiHit", "Multi Hit",     fontName)
-	self:InitColorWidget(content.Widget, "cDmgVuln",     "Vulnerability", fontName)
-	self:InitColorWidget(content.Widget, "cDmgAbsorb",   "Absorb",        fontName)
-	content.Widget:ArrangeChildrenVert(Window.CodeEnumArrangeOrigin.Middle)
 
-	-- Load Text Widgets
-	content = self:LoadCategoryWidget(self.options, "Text", { top = totalHeight, itemHeight = 70, numItems = 4, padding = 30 })
-	totalHeight = totalHeight + content.Size
-	self:InitFontWidget    (content.Widget, fontName, colorPreviews)
-	self:InitPositionWidget(content.Widget, positionName)
-	self:InitPatternWidget (content.Widget, patternName)
-	self:InitCollisionWidget(content.Widget, collisionName)
-	content.Widget:ArrangeChildrenVert(Window.CodeEnumArrangeOrigin.Middle)
-	
-	-- Load Scale Widgets
-	content = self:LoadCategoryWidget(self.options, "Scale", { top = totalHeight, itemHeight = 70, numItems = 3, padding = 30 })
-	totalHeight = totalHeight + content.Size
-	self:InitSliderWidget(content.Widget, "fDmgOutNormalScale", "Normal Scale")
-	self:InitSliderWidget(content.Widget, "fDmgOutCritScale",   "Critical Scale")
-	self:InitSliderWidget(content.Widget, "fDmgOutDuration", "Duration", {0, 10.0, 0.05})
-	content.Widget:ArrangeChildrenVert(Window.CodeEnumArrangeOrigin.Middle)
-	
-	content = self:LoadCategoryWidget(self.options, "Other", { top = totalHeight, itemHeight = 70, numItems = 4, padding = 0 } )
-	self:InitValueWidget(content.Widget, "iDmgBigCritOutValue", "Emphasize crits above this value")
-	self:InitValueWidget(content.Widget, "iDmgOutThreshold", "Don't show any damage under this threshold")
-	self:InitOptionBoxWidget(content.Widget, "bDmgOutMergeShield", "Merge shield and regular damage into one number")
-	self:InitOptionBoxWidget(content.Widget, "bDmgOutShowAbsorb", "Display absorbed damage differently than regular damage.")
-	--self:InitOptionBoxWidget(content.Widget, "b
-	totalHeight = totalHeight + content.Size
-	content.Widget:ArrangeChildrenVert(Window.CodeEnumArrangeOrigin.Middle)
-	
-	--content.Widget:ArrangeChildrenVert(Window.CodeEnumArrangeOrigin.Middle)
-	
-	self.options:ArrangeChildrenTiles(0)
+	self:LoadSubCategory(self.options, 
+	{ 
+		Color = 
+			   { 
+				{k_InitColor, "cDmgDefault",   "Normal",        fontName}, 
+				{k_InitColor, "cDmgCrit",      "Critical",      fontName},
+				{k_InitColor, "cDmgMultiHit",  "Multi Hit",     fontName},
+				{k_InitColor, "cDmgVuln",      "Vulnerability", fontName}, 
+				{k_InitColor, "cDmgAbsorb",    "Absorb",        fontName}
+			   },  
+		Text = 
+			   { 
+				{k_InitFont, 	  fontName}, 
+				{k_InitPosition,  positionName}, 
+				{k_InitPattern,   patternName},
+				{k_InitCollision, collisionName}
+			   }, 
+  		Other = 
+			   { 
+				{k_InitValue,     "iDmgBigCritOutValue", "Emphasize crits above this value"}, 
+				{k_InitValue,     "iDmgOutThreshold",    "Don't show any damage under this threshold"},
+				{k_InitOptionBox, "bDmgOutMergeShield",  "Merge shield and regular damage into one number"}, 
+				{k_InitOptionBox, "bDmgOutShowAbsorb",   "Display absorbed damage differently than regular damage."}
+			   },
+		Scale = 
+			   { 
+				{k_InitSlider, "fDmgOutNormalScale", "Normal Scale"}, 
+				{k_InitSlider, "fDmgOutCritScale",   "Critical Scale"},
+				{k_InitSlider, "fDmgOutDuration",    "Duration", {0, 10.0, 0.05}} 
+			   }, 
+	})
+
 end
 
 -----------------------------------------------------------------------------------------------
@@ -322,40 +293,80 @@ function Options:InitInDmg()
 	local positionName   = "nDmgInPos"
 	local patternName    = "nDmgInPattern"
 	local collisionName  = "nDmgInCollision"
-	
-	-- Load Color Widgets
-	local content = self:LoadCategoryWidget(self.options, "Color", { top = -2, itemHeight = 70, numItems = 3, padding = 30 })
-	totalHeight = totalHeight + content.Size
-	self:InitColorWidget(content.Widget, "cDmgInDefault",  "Normal",    fontName)
-	self:InitColorWidget(content.Widget, "cDmgInCrit",     "Critical",  fontName)
-	self:InitColorWidget(content.Widget, "cDmgInAbsorb",   "Absorb",    fontName)
-	content.Widget:ArrangeChildrenVert(Window.CodeEnumArrangeOrigin.Middle)
 
-	-- Load Text Widgets
-	content = self:LoadCategoryWidget(self.options, "Text", { top = totalHeight, itemHeight = 70, numItems = 4, padding = 30 })
-	totalHeight = totalHeight + content.Size
-	self:InitFontWidget    (content.Widget, fontName, colorPreviews)
-	self:InitPositionWidget(content.Widget, positionName)
-	self:InitPatternWidget (content.Widget, patternName)
-	self:InitCollisionWidget(content.Widget, collisionName)
-	content.Widget:ArrangeChildrenVert(Window.CodeEnumArrangeOrigin.Middle)
+
+	self:LoadSubCategory(self.options, 
+	{ 
+		Color = 
+			   { 
+				{k_InitColor, "cDmgInDefault",  "Normal",    fontName}, 
+				{k_InitColor, "cDmgInCrit",     "Critical",  fontName}, 
+				{k_InitColor, "cDmgInAbsorb",   "Absorb",    fontName}
+			   },  
+		Text = 
+			   { 
+				{k_InitFont, 	  fontName}, 
+				{k_InitPosition,  positionName}, 
+				{k_InitPattern,   patternName},
+				{k_InitCollision, collisionName}
+			   }, 
+		Scale = 
+			   { 
+				{k_InitSlider, "fDmgInNormalScale", "Normal Scale"}, 
+				{k_InitSlider, "fDmgInCritScale",   "Critical Scale"}, 
+			   } 
+	})
 	
-	-- Load Scale Widgets
-	content = self:LoadCategoryWidget(self.options, "Scale", { top = totalHeight, itemHeight = 70, numItems = 2, padding = 30 })
-	totalHeight = totalHeight + content.Size
-	self:InitSliderWidget(content.Widget, "fDmgInNormalScale", "Normal Scale")
-	self:InitSliderWidget(content.Widget, "fDmgInCritScale",   "Critical Scale")
-	content.Widget:ArrangeChildrenVert(Window.CodeEnumArrangeOrigin.Middle)
-	
-	self.options:ArrangeChildrenTiles(0)
 end
 
 -----------------------------------------------------------------------------------------------
 function Options:InitGeneral()
 -----------------------------------------------------------------------------------------------
-	self.messages = self.options:FindChild("Messages")
+	
+
+	self:LoadSubCategory(self.options, 
+	{
+		Display = 
+		{
+			{ k_InitOptionBox, "bShowZoneChange", "Show zone changes."},
+			{ k_InitOptionBox, "bShowRealmBroadCast", "Show realm broadcasts."},
+		}
+
+	})
+
 end
 
+-----------------------------------------------------------------------------------------------
+function Options:LoadSubCategory(parentForm, tWidgets)
+-----------------------------------------------------------------------------------------------
+	local totalSize = 0
+	local startSize = 0
+	local currentSize = 0
+
+	for k,v in pairs(tWidgets) do
+		currentSize = 60 -- Size of the header
+		startSize = totalSize
+
+		local category = self:LoadWidget("ContentCategory", parentForm, { "Description", "Content" })
+		category.Description:SetText(k)
+
+		-- Use the first element of the table as the init function to call,
+		-- and unpack the rest of the arguments for the actual function
+		for i,iv in ipairs(v) do
+			local height = self.widgetFunctions[iv[1]](category.Content, unpack(iv, 2))
+			currentSize = currentSize + height
+		end
+
+		-- Rearrange all of the sub elements appropriately
+		local left, top, right, bottom = category.Widget:GetAnchorOffsets()
+		category.Widget:SetAnchorOffsets(left, startSize, right, startSize + currentSize)
+		category.Content:ArrangeChildrenVert(Window.CodeEnumArrangeOrigin.Middle)
+
+		totalSize = totalSize + currentSize
+	end
+
+	parentForm:ArrangeChildrenTiles(0)
+end
 
 -----------------------------------------------------------------------------------------------
 -- Radio Group for options all have this as their callback
@@ -392,7 +403,7 @@ function Options:LoadWidget(strName, parentForm, tSub)
 -----------------------------------------------------------------------------------------------
 	local tForms = {}
 	local widget = Apollo.LoadForm(self.xmlDoc, strName, parentForm, self)
-	tForms["Widget"] = widget
+	tForms.Widget = widget
 	for i,n in ipairs(tSub) do
 		tForms[n] = widget:FindChild(n)
 	end
@@ -404,7 +415,7 @@ end
 -----------------------------------------------------------------------------------------------
 function Options:LoadColorWidget(parentForm)
 -----------------------------------------------------------------------------------------------
-	return self:LoadWidget("ColorPickerWidget", parentForm, { "Preview", "Description", "Color" } )
+	return self:LoadWidget("ColorPickerWidget", parentForm, { "Preview", "Description", "Color", "ColorImg" } )
 end
 
 -----------------------------------------------------------------------------------------------
@@ -434,16 +445,19 @@ end
 -----------------------------------------------------------------------------------------------
 -- Helper function for loading a list selection widget
 -----------------------------------------------------------------------------------------------
-function Options:LoadListSelectionWidget(parentForm)
+function Options:LoadListSelectionWidget(parentForm, tParams)
 -----------------------------------------------------------------------------------------------
-	local tWidget = self:LoadWidget("ListSelectionWidget", parentForm, { "Description", "Current", "Inc", "Dec" } )
-	
-	-- Set show/hide on button toggle
-	tWidget.Current:AddEventHandler("ButtonCheck", "ListButtonChecked")
-	tWidget.Current:AddEventHandler("ButtonUncheck", "ListButtonChecked")
+	local tWidget = self:LoadWidget("ListSelectionWidget", parentForm, 
+		{ "Description", "Current", "Inc", "Dec" } )
+
+	local params = self.textParams[tParams.name]
+ 	
 	tWidget.Inc:AddEventHandler("ButtonSignal", "OnListPosChanged")
 	tWidget.Dec:AddEventHandler("ButtonSignal", "OnListPosChanged")
-	table.insert(self.textWidgets, tWidget)
+	tWidget.Inc:Enable(params.Idx ~= 1)
+	tWidget.Dec:Enable(params.Idx ~= params.Max)
+	tWidget.Inc:SetData(tParams)
+	tWidget.Dec:SetData(tParams)
 	return tWidget
 end
 
@@ -453,9 +467,16 @@ end
 function Options:OnListPosChanged(wndHandler, wndControl)
 -----------------------------------------------------------------------------------------------
 	local name = wndHandler:GetName()
-	-- Ternary operator in lua makes no sense (this is backwards because of the way the lists are)
+	local data = wndHandler:GetData()
+	local params = self.textParams[data.name]
+
 	local inc = (name == "Inc") and -1 or 1
-	wndHandler:GetData().callback(inc)
+	params.Idx = Clamp(inc + params.Idx, params.Max, 1)
+
+	params.Widget.Inc:Enable(params.Idx ~= 1)
+	params.Widget.Dec:Enable(params.Idx ~= params.Max)
+	
+	data.callback(params.Idx)
 end
 
 -----------------------------------------------------------------------------------------------
@@ -521,115 +542,133 @@ end
 -- < InitSliderWidget
 -----------------------------------------------------------------------------------------------
 
+-----------------------------------------------------------------------------------------------
+-- TODO: Rework the increment/decrement widgets to reduce copied code.
+--       Currently, all of the widgets do basically the same thing.
+-----------------------------------------------------------------------------------------------
 
 -----------------------------------------------------------------------------------------------
-function Options:InitFontWidget(parentForm, setting, previews)
+function Options:InitFontWidget(parentForm, setting)
 -----------------------------------------------------------------------------------------------
-	local tWidget = self:LoadListSelectionWidget(parentForm)
-	tWidget.Description:SetText("Font")
-	tWidget.Current:SetText("1234567890")
-	tWidget.Current:SetFont(self.parent.tSettings[setting])
-	tWidget.Current:SetData(self:LookupIndex(fontList, self.parent.tSettings[setting]))
-	
-	local tCallback = {
-		callback = function(nInc)
-			local listSize = table.getn(fontList)
-			local idx = Clamp(nInc + tWidget.Current:GetData(), listSize, 1)
-			local font = fontList[idx]
-			tWidget.Current:SetFont(font)
-			tWidget.Current:SetData(idx)
+	self.textParams[k_InitFont]     = {}
+	self.textParams[k_InitFont].Max = table.getn(fontList)
+	self.textParams[k_InitFont].Idx = self:LookupIndex(fontList, self.parent.tSettings[setting])
+
+	local tParams = {
+		callback = function(nIdx)
+			local font = fontList[nIdx]
+
+			-- Update the preview for the setting
+			self.textParams[k_InitFont].Widget.Current:SetFont(font)
 			
-			-- Update the previews
+			-- Update the color previews
 			for idx, prev in ipairs(self.colorPreviews) do
 				prev:SetFont(font)
 			end
 			
+			-- Update the setting
 			self.parent.tSettings[setting] = font
-		end
+		end,
+		name = k_InitFont 
 	}
-	
-	tWidget.Inc:SetData(tCallback)
-	tWidget.Dec:SetData(tCallback)
+
+	local tWidget = self:LoadListSelectionWidget(parentForm, tParams)
+	tWidget.Description:SetText("Font")
+	tWidget.Current:SetText("1234567890")
+	tWidget.Current:SetFont(self.parent.tSettings[setting])
+	tWidget.Current:SetTooltip("The font displayed for floating text.")
+	self.textParams[k_InitFont].Widget = tWidget
+
+	return tWidget.Widget:GetHeight()
 end
 
 -----------------------------------------------------------------------------------------------
 function Options:InitPositionWidget(parentForm, setting)
 -----------------------------------------------------------------------------------------------
-	local tWidget    = self:LoadListSelectionWidget(parentForm)
 	local strDisplay = self:LookupKeyed(posLookup, self.parent.tSettings[setting], "Display")
-	tWidget.Description:SetText("Position")
-	tWidget.Current:SetText(strDisplay)
-	tWidget.Current:SetData(self:LookupIndex(posList, self.parent.tSettings[setting]))
-	
-	local tCallback = {
-		callback = function(nInc)
-			local listSize = table.getn(posList)
-			local idx = Clamp(nInc + tWidget.Current:GetData(), listSize, 1)
-			local pos = posList[idx]
-			tWidget.Current:SetData(idx)
-			
+	local idx        = self:LookupIndex(posList, strDisplay)
+
+	self.textParams[k_InitPosition] = {}
+	self.textParams[k_InitPosition].Max = table.getn(posList)
+	self.textParams[k_InitPosition].Idx = idx
+
+	local tParams = {
+		callback = function(nIdx)
+			local pos = posList[nIdx]
 			self.parent.tSettings[setting] = self:LookupKeyed(posLookup, pos, "Value")
-			tWidget.Current:SetText(pos)
-		end
+			self.textParams[k_InitPosition].Widget.Current:SetText(pos)
+		end,
+		name = k_InitPosition
 	}
 
-	tWidget.Inc:SetData(tCallback)
-	tWidget.Dec:SetData(tCallback)
+	local tWidget = self:LoadListSelectionWidget(parentForm, tParams)
+	tWidget.Description:SetText("Position")
+	tWidget.Current:SetText(strDisplay)
+	tWidget.Current:SetTooltip("The position on the unit being targeted that the text will appear.")
+
+	self.textParams[k_InitPosition].Widget = tWidget
+
+	return tWidget.Widget:GetHeight()
 end
 
 -----------------------------------------------------------------------------------------------
 function Options:InitPatternWidget(parentForm, setting)
 -----------------------------------------------------------------------------------------------
-	local tWidget = self:LoadListSelectionWidget(parentForm)
-	local pattern = self.parent.tSettings[setting]
-	tWidget.Description:SetText("Pattern")
-	tWidget.Current:SetText(pattern)
-	tWidget.Current:SetData(self:LookupIndex(patternList, self.parent.tSettings[setting]))
-	
-	local tCallback = {
-		callback = function(nInc)
-			local listSize = table.getn(patternList)
-			local idx = Clamp(nInc + tWidget.Current:GetData(), listSize, 1)
-			local pattern = patternList[idx]
-			tWidget.Current:SetData(idx)
-			
+	self.textParams[k_InitPattern] = {}
+	self.textParams[k_InitPattern].Max = table.getn(patternList)
+	self.textParams[k_InitPattern].Idx = self:LookupIndex(patternList, self.parent.tSettings[setting])
+
+	local tParams = {
+		callback = function(nIdx)
+			local pattern = patternList[nIdx]
 			self.parent.tSettings[setting] = pattern
-			tWidget.Current:SetText(pattern)
-		end
+			self.textParams[k_InitPattern].Widget.Current:SetText(pattern)
+		end,
+		name = k_InitPattern
 	}
 
-	tWidget.Inc:SetData(tCallback)
-	tWidget.Dec:SetData(tCallback)
+	local tWidget  = self:LoadListSelectionWidget(parentForm, tParams)
+	local pattern  = self.parent.tSettings[setting]
+	tWidget.Description:SetText("Pattern")
+	tWidget.Current:SetText(pattern)
+	tWidget.Current:SetTooltip("The pattern in which the text will move after it appears.")
+
+	self.textParams[k_InitPattern].Widget = tWidget
+
+	return tWidget.Widget:GetHeight()
 end
 
 
 -----------------------------------------------------------------------------------------------
 function Options:InitCollisionWidget(parentForm, setting)
 -----------------------------------------------------------------------------------------------
-	local tWidget = self:LoadListSelectionWidget(parentForm)
-	local coll 	  = self:LookupKeyed(collisionLookup, self.parent.tSettings[setting], "Display")
-	tWidget.Description:SetText("Collision")
-	tWidget.Current:SetText(coll)
-	tWidget.Current:SetData(self:LookupIndex(patternList, self.parent.tSettings[setting]))
-	
-	local tCallback = {
-		callback = function(nInc)
-			local listSize = table.getn(collisionList)
-			local idx = Clamp(nInc + tWidget.Current:GetData(), listSize, 1)
-			local coll = collisionList[idx]
-			tWidget.Current:SetData(idx)
-			
+	local coll = self:LookupKeyed(collisionLookup, self.parent.tSettings[setting], "Display")
+	local idx  = self:LookupIndex(collisionList,   coll)
+
+	self.textParams[k_InitCollision] = {}
+	self.textParams[k_InitCollision].Max = table.getn(collisionList)
+	self.textParams[k_InitCollision].Idx = idx
+
+	local tParams = {
+		callback = function(nIdx)
+			local coll = collisionList[nIdx]
 			self.parent.tSettings[setting] = self:LookupKeyed(collisionLookup, coll, "Value")
-			tWidget.Current:SetText(coll)
-		end
+			self.textParams[k_InitCollision].Widget.Current:SetText(coll)
+		end,
+		name = k_InitCollision
 	}
 
-	tWidget.Inc:SetData(tCallback)
-	tWidget.Dec:SetData(tCallback)
+	local tWidget  = self:LoadListSelectionWidget(parentForm, tParams)
+	tWidget.Description:SetText("Collision")
+	tWidget.Current:SetText(coll)
+	tWidget.Current:SetTooltip("The way in which the text will re-position itself if text overlaps.")
+	self.textParams[k_InitCollision].Widget = tWidget
+
+	return tWidget.Widget:GetHeight()
 end
 
 -----------------------------------------------------------------------------------------------
-function Options:InitSliderWidget(parentForm, setting, description, tLimits, strTooltip)
+function Options:InitSliderWidget(parentForm, setting, description, tLimits)
 -----------------------------------------------------------------------------------------------
 	local tWidget = self:LoadSliderWidget(parentForm)
 	local value   = self.parent.tSettings[setting]	
@@ -637,15 +676,19 @@ function Options:InitSliderWidget(parentForm, setting, description, tLimits, str
 	tWidget.Preview:SetText(("%1.2f"):format(value))
 	tWidget.Slider:AddEventHandler("SliderBarChanged", "OnSliderWidgetChanged")
 	tWidget.Slider:SetValue(value)
-	tWidget.Slider:SetData{
+	tWidget.Slider:SetData {
 		preview = tWidget.Preview,
 		setting = setting
 	}
+
 	if tLimits then
-		tWidget.Slider:SetMinMax(tLimits[1], tLimits[2], tLimits[3])
+		tWidget.Slider:SetMinMax(unpack(tLimits))
 	else
-		tWidget.Slider:SetMinMax(0, 4, 0.05) -- Really fucking descriptive function name carbino SetMinMaxAndTickAndOtherThingsButWeWontTellYouInTheName
+		-- Really fucking descriptive function name carbino SetMinMaxAndTickAndOtherThingsButWeWontTellYouInTheName
+		tWidget.Slider:SetMinMax(0, 4, 0.05) 
 	end
+
+	return tWidget.Widget:GetHeight()
 end
 
 -----------------------------------------------------------------------------------------------
@@ -675,6 +718,8 @@ function Options:InitOptionBoxWidget(parentForm, setting, description)
 	}
 	tWidget.OptionBox:AddEventHandler("ButtonCheck",   "OnOptionBoxWidgetChecked")
 	tWidget.OptionBox:AddEventHandler("ButtonUncheck", "OnOptionBoxWidgetChecked")
+
+	return tWidget.Widget:GetHeight()
 end
 
 -----------------------------------------------------------------------------------------------
@@ -699,11 +744,13 @@ function Options:InitValueWidget(parentForm, setting, description)
 	local value = self.parent.tSettings[setting]
 	tWidget.Description:SetText(description)
 	tWidget.Value:SetText(value)
-	tWidget.Value:SetMaxTextLength(5)
+	tWidget.Value:SetMaxTextLength(5) --limit from 0 to 99999
 	tWidget.Value:SetData{
 		setting = setting
 	}
 	tWidget.Value:AddEventHandler("EditBoxChanged", "OnValueWidgetChanged")
+
+	return tWidget.Widget:GetHeight()
 end
 
 -----------------------------------------------------------------------------------------------
@@ -732,6 +779,7 @@ function Options:InitColorWidget(parentForm, setting, description, font)
 	
 	tWidget.Color:SetData {
 		preview = tWidget.Preview,
+		image   = tWidget.ColorImg,
 		setting = setting
 	}
 	
@@ -741,10 +789,20 @@ function Options:InitColorWidget(parentForm, setting, description, font)
 	tWidget.Color:AddEventHandler("EditBoxChanged", "OnColorPickerWidgetEditBoxChanged")
 
 	tWidget.Preview:SetTextColor("FF"..value)
+	tWidget.ColorImg:SetBGColor("FF"..value)
+	tWidget.ColorImg:AddEventHandler("MouseButtonDown", "OnColorPressed")
+	tWidget.ColorImg:SetData {
+		value = tostring(value),
+		preview = tWidget.Preview,
+		color   = tWidget.Color,
+		setting = setting
+	}
 	tWidget.Preview:SetFont(font)
 	
 	tWidget.Description:SetText(description)
 	table.insert(self.colorPreviews, tWidget.Preview)
+
+	return tWidget.Widget:GetHeight()
 end
 
 -----------------------------------------------------------------------------------------------
@@ -757,9 +815,32 @@ function Options:OnColorPickerWidgetEditBoxChanged(wndHandler, wndControl)
 	local data = wndHandler:GetData()
 	
 	data.preview:SetTextColor("ff"..value)
+	data.image:GetData().value = value
+	data.image:SetBGColor("ff"..value)
 	self.parent.tSettings[data.setting] = tonumber(value, 16)
 end
 
+-----------------------------------------------------------------------------------------------
+-- Whenever a color widget reaches max length
+-----------------------------------------------------------------------------------------------
+function Options:OnColorPressed(wndHandler, wndControl)
+-----------------------------------------------------------------------------------------------
+	local data = wndHandler:GetData()
+
+	local callback = function(tRet)
+		data.preview:SetTextColor("ff"..tRet.HEX)
+		data.color:SetText(tRet.HEX)
+		wndHandler:SetBGColor("ff"..tRet.HEX)
+		data.value = tRet.HEX
+		self.parent.tSettings[data.setting] = tonumber(tRet.HEX, 16)
+	end
+	
+	if Apollo.GetAddon("IronColorPicker") ~= nil then
+		Apollo.GetAddon("IronColorPicker"):ShowColor(data.value, callback)
+	else
+		ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_System, "Cannot open up color picker because you don't have the addon!", "IronCombatText")
+	end
+end
 
 -----------------------------------------------------------------------------------------------
 function Options:LookupIndex(list, value)

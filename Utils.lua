@@ -1,13 +1,10 @@
-local IronCombatText = Apollo.GetAddon("IronCombatText")
-
 local Utils = {}
-setmetatable(Utils, {__index = _G})
-setfenv(1, Utils)
+local IronCombatText = Apollo.GetAddon("IronCombatText")
 
 ---------------------------------------------------------------------------------------------------
 function Utils:Init(parent)
 ---------------------------------------------------------------------------------------------------
-	Apollo.LinkAddon(parent, Utils)
+	Apollo.LinkAddon(parent, self)
 end
 
 ---------------------------------------------------------------------------------------------------

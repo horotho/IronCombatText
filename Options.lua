@@ -69,18 +69,44 @@ local collisionLookup =
 	Ignore     = CombatFloater.CodeEnumFloaterCollisionMode.IgnoreCollision
 }
 
-local patternList = 
-{
-  "Default",
-  "Circular",
-  "StreamUpRight",
-  "StreamUpLeft",
-  "StreamDownRight",
-  "StreamDownLeft",
-  "StraightUp",
-  "StraightDown",
-  "Test"
-}
+
+
+---------------------------------------------------------------------------------------------------
+-- Yes, I know this is basically a tree, but I don't know enough about Lua to make a tree
+-- traversal and pass the object the right 'self'.
+---------------------------------------------------------------------------------------------------
+local CategoryBuilder = {}
+CategoryBuilder.__index = CategoryBuilder
+
+setmetatable(CategoryBuilder, {
+  __call = function (cls, ...)
+    return cls.new(...)
+  end,
+})
+
+---------------------------------------------------------------------------------------------------
+function CategoryBuilder.new()
+---------------------------------------------------------------------------------------------------
+  local self = setmetatable({}, CategoryBuilder)
+  self.count = 0
+  self.categories = {}
+  self.elements = {}
+  return self
+end
+
+---------------------------------------------------------------------------------------------------
+function CategoryBuilder:AddCategory(strName)
+---------------------------------------------------------------------------------------------------
+	self.count = self.count + 1
+	self.categories[self.count] = {name = strName, category = CategoryBuilder()}
+	return self.categories[self.count].category
+end
+
+---------------------------------------------------------------------------------------------------
+function CategoryBuilder:AddElement(...)
+---------------------------------------------------------------------------------------------------
+	table.insert(self.elements, arg)
+end
 
 -----------------------------------------------------------------------------------------------
 -- Init Function
@@ -95,30 +121,23 @@ function Options:Init(parent)
 	-- Function table for category init
 	self.initFunctions = 
 	{
-		OutDmg  = function() self:InitOutDmg()  end,
-		InDmg   = function() self:InitInDmg()   end,
-		InHeal  = function() self:InitInHeal()  end,
-		OutHeal = function() self:InitOutHeal() end,
-		General = function() self:InitGeneral() end,
+		{ "General", 		  "InitGeneral" },
+		{ "Outgoing Damage",  "InitOutDmg"},
+		{ "Incoming Damage",  "InitInDmg"},
+		{ "Outgoing Healing", "InitOutHeal"},
+		{ "Incoming Healing", "InitInHeal"},
 	}
 
-	-- Function table for widget init
-	self.widgetFunctions = 
-	{
-		[k_InitColor]		= function(...) return self:InitColorWidget(...) 		end,
-		[k_InitPattern] 	= function(...) return self:InitPatternWidget(...) 		end,
-		[k_InitFont]		= function(...) return self:InitFontWidget(...) 		end,
-		[k_InitCollision] 	= function(...) return self:InitCollisionWidget(...) 	end,
-		[k_InitPosition] 	= function(...) return self:InitPositionWidget(...) 	end,
-		[k_InitSlider] 		= function(...) return self:InitSliderWidget(...) 		end,
-		[k_InitValue]		= function(...) return self:InitValueWidget(...) 		end,
-		[k_InitOptionBox]	= function(...) return self:InitOptionBoxWidget(...) 	end,
-
-	}
-	
 	self.parent = parent
-	self.xmlDoc = XmlDoc.CreateFromFile("OptionsPanel.xml")
-	self.xmlDoc:RegisterCallback("OnDocLoaded", self)
+
+	-- 
+	self.patternList = {}
+	for k,v in pairs(self.parent.Patterns) do
+		_, _, name = string.find(k, "Pattern(%a+)")
+		if name ~= nil and name ~= '' then
+			table.insert(self.patternList, name)
+		end
+	end
 end
 
 -----------------------------------------------------------------------------------------------
@@ -132,11 +151,12 @@ function Options:OnDocLoaded()
 			Apollo.AddAddonErrorText(self, "Could not load the main window for some reason.")
 			return
 		end
-		
-	    self.wndMain:Show(false, true)
+
 		self.content = self.wndMain:FindChild("Content")
+		self:SetupCategories()
+    	self.wndMain:Invoke()
 		self:LoadCategory(self.parent.tSettings.currentCategory)
-		 
+
 	else
 		Apollo.AddAddonErrorText(self, "Could not load the xml doc for some reason.")
 	end
@@ -147,225 +167,215 @@ end
 -----------------------------------------------------------------------------------------------
 function Options:OnInvokeOptions()
 -----------------------------------------------------------------------------------------------
-	self.wndMain:Invoke()
-	self:LoadCategory(self.parent.tSettings.currentCategory)
+	if self.xmlDoc == nil then
+		self.xmlDoc = XmlDoc.CreateFromFile("OptionsPanel.xml")
+		self.xmlDoc:RegisterCallback("OnDocLoaded", self)
+	else
+    	self:SetupCategories()
+    	self.wndMain:Invoke()
+		self:LoadCategory(self.parent.tSettings.currentCategory)
+	end
 end
 
+-----------------------------------------------------------------------------------------------
+-- Sets up all of the category buttons
+-----------------------------------------------------------------------------------------------
+function Options:SetupCategories()
+-----------------------------------------------------------------------------------------------	
+	self.settingsButtons = self.wndMain:FindChild("SettingsButtons")
+	self.settingsButtons:DestroyChildren()
+
+	for i,v in ipairs(self.initFunctions) do
+		local widget = self:LoadWidget("CategoryButtonWidget", self.settingsButtons, {"Button"})
+		widget.Button:SetText(v[1])
+		widget.Button:AddEventHandler("ButtonCheck", "OnOptionSelected")
+		widget.Button:SetData {
+			func = v[2]
+		}
+
+		if self.parent.tSettings.currentCategory == v[2] then
+			widget.Button:SetCheck(true)
+		end
+	end
+
+	self.settingsButtons:ArrangeChildrenVert(Window.CodeEnumArrangeOrigin.Top)
+end
 
 -----------------------------------------------------------------------------------------------
 -- Loads a category when a radio button is pressed on the main options screen.
 -----------------------------------------------------------------------------------------------
 function Options:LoadCategory(categoryName)
 -----------------------------------------------------------------------------------------------
-	self.currentButton = self.wndMain:FindChild(categoryName)
-	self.currentButton:SetCheck(true)
 	self.content:DestroyChildren()
 	self.options = Apollo.LoadForm(self.xmlDoc, "BaseCategory", self.content, self)
 	self.parent.tSettings.currentCategory = categoryName
-	self.currentCategory = categoryName
-	
+
 	-- Global variables that are easy to re-init here and add later
 	self.colorPreviews = {}
 	self.textWidgets   = {}
 	self.textParams    = {}
 	self.totalSize 	   = 0
-	
+
 	if self.options then
-		self.initFunctions[categoryName]()
+		-- Populate the returned category from the Init functions
+		local builder = CategoryBuilder()
+		self:PopulateCategory(self[categoryName](self, builder))
 	else
 		Apollo.AddAddonErrorText(self, "Unable to load category ".. categoryName)
 	end
 end
 
 -----------------------------------------------------------------------------------------------
-function Options:InitInHeal()
------------------------------------------------------------------------------------------------
-	local fontName = "nHealInFont"
-
-	self:LoadSubCategory(self.options, 
-	{ 
-		Color = 
-			   { 
-				{k_InitColor, "cHealInDefault",  "Normal",       fontName}, 
-				{k_InitColor, "cHealInCrit",     "Critical",     fontName},
-				{k_InitColor, "cHealInShield", 	 "Shield Heal",  fontName},
-			   },  
-		Text = 
-			   { 
-				{k_InitFont, 	  fontName}, 
-				{k_InitPosition,  "nHealInPos"}, 
-				{k_InitPattern,   "nHealInPattern"},
-				{k_InitCollision, "nHealInCollision"}
-			   }, 
-  		Other = 
-			   { 
-				{k_InitValue,  "iHealInThreshold",    "Don't show any damage under this threshold"},
-			   },
-		Scale = 
-			   { 
-				{k_InitSlider, "fHealInNormalScale", "Normal Scale"}, 
-				{k_InitSlider, "fHealInCritScale",   "Critical Scale"},
-			   }, 
-	})
-end
-
------------------------------------------------------------------------------------------------
-function Options:InitOutHeal()
------------------------------------------------------------------------------------------------
-	local fontName = "nHealOutFont"
-	
-	self:LoadSubCategory(self.options, 
-	{ 
-		Color = 
-			   { 
-				{k_InitColor, "cHealDefault",  "Normal",       fontName}, 
-				{k_InitColor, "cHealCrit",     "Critical",     fontName},
-				{k_InitColor, "cHealMultiHit", "Multi Hit",    fontName},
-				{k_InitColor, "cHealShield",   "Shield Heal",  fontName}, 
-			   },  
-		Text = 
-			   { 
-				{k_InitFont, 	  fontName}, 
-				{k_InitPosition,  "nHealOutPos"}, 
-				{k_InitPattern,   "nHealOutPattern"},
-				{k_InitCollision, "nHealOutCollision"}
-			   }, 
-  		Other = 
-			   { 
-				{k_InitValue,  "iHealOutThreshold",    "Don't show any damage under this threshold"},
-			   },
-		Scale = 
-			   { 
-				{k_InitSlider, "fHealOutNormalScale", "Normal Scale"}, 
-				{k_InitSlider, "fHealOutCritScale",   "Critical Scale"},
-			   }, 
-	})
-end
-
------------------------------------------------------------------------------------------------
-function Options:InitOutDmg()
------------------------------------------------------------------------------------------------
-	local totalHeight = 0
-	local fontName       = "nDmgOutFont"
-	local positionName   = "nDmgOutPos"
-	local patternName    = "nDmgOutPattern"
-	local collisionName  = "nDmgOutCollision"
-
-	self:LoadSubCategory(self.options, 
-	{ 
-		Color = 
-			   { 
-				{k_InitColor, "cDmgDefault",   "Normal",        fontName}, 
-				{k_InitColor, "cDmgCrit",      "Critical",      fontName},
-				{k_InitColor, "cDmgMultiHit",  "Multi Hit",     fontName},
-				{k_InitColor, "cDmgVuln",      "Vulnerability", fontName}, 
-				{k_InitColor, "cDmgAbsorb",    "Absorb",        fontName}
-			   },  
-		Text = 
-			   { 
-				{k_InitFont, 	  fontName}, 
-				{k_InitPosition,  positionName}, 
-				{k_InitPattern,   patternName},
-				{k_InitCollision, collisionName}
-			   }, 
-  		Other = 
-			   { 
-				{k_InitValue,     "iDmgBigCritOutValue", "Emphasize crits above this value"}, 
-				{k_InitValue,     "iDmgOutThreshold",    "Don't show any damage under this threshold"},
-				{k_InitOptionBox, "bDmgOutMergeShield",  "Merge shield and regular damage into one number"}, 
-				{k_InitOptionBox, "bDmgOutShowAbsorb",   "Display absorbed damage differently than regular damage."}
-			   },
-		Scale = 
-			   { 
-				{k_InitSlider, "fDmgOutNormalScale", "Normal Scale"}, 
-				{k_InitSlider, "fDmgOutCritScale",   "Critical Scale"},
-				{k_InitSlider, "fDmgOutDuration",    "Duration", {0, 10.0, 0.05}} 
-			   }, 
-	})
-
-end
-
------------------------------------------------------------------------------------------------
-function Options:InitInDmg()
------------------------------------------------------------------------------------------------
-	local totalHeight = 0
-	local fontName       = "nDmgInFont"
-	local positionName   = "nDmgInPos"
-	local patternName    = "nDmgInPattern"
-	local collisionName  = "nDmgInCollision"
-
-
-	self:LoadSubCategory(self.options, 
-	{ 
-		Color = 
-			   { 
-				{k_InitColor, "cDmgInDefault",  "Normal",    fontName}, 
-				{k_InitColor, "cDmgInCrit",     "Critical",  fontName}, 
-				{k_InitColor, "cDmgInAbsorb",   "Absorb",    fontName}
-			   },  
-		Text = 
-			   { 
-				{k_InitFont, 	  fontName}, 
-				{k_InitPosition,  positionName}, 
-				{k_InitPattern,   patternName},
-				{k_InitCollision, collisionName}
-			   }, 
-		Scale = 
-			   { 
-				{k_InitSlider, "fDmgInNormalScale", "Normal Scale"}, 
-				{k_InitSlider, "fDmgInCritScale",   "Critical Scale"}, 
-			   } 
-	})
-	
-end
-
------------------------------------------------------------------------------------------------
-function Options:InitGeneral()
------------------------------------------------------------------------------------------------
-	
-
-	self:LoadSubCategory(self.options, 
-	{
-		Display = 
-		{
-			{ k_InitOptionBox, "bShowZoneChange", "Show zone changes."},
-			{ k_InitOptionBox, "bShowRealmBroadCast", "Show realm broadcasts."},
-		}
-
-	})
-
-end
-
------------------------------------------------------------------------------------------------
-function Options:LoadSubCategory(parentForm, tWidgets)
+function Options:PopulateCategory(category)
 -----------------------------------------------------------------------------------------------
 	local totalSize = 0
-	local startSize = 0
 	local currentSize = 0
 
-	for k,v in pairs(tWidgets) do
-		currentSize = 60 -- Size of the header
+	for i,v in ipairs(category.categories) do
+		currentSize = 65 -- Size of the header
 		startSize = totalSize
 
-		local category = self:LoadWidget("ContentCategory", parentForm, { "Description", "Content" })
-		category.Description:SetText(k)
+		local category = self:LoadWidget("ContentCategory", self.options, { "Description", "Content" })
+		category.Description:SetText(v.name)
 
 		-- Use the first element of the table as the init function to call,
 		-- and unpack the rest of the arguments for the actual function
-		for i,iv in ipairs(v) do
-			local height = self.widgetFunctions[iv[1]](category.Content, unpack(iv, 2))
+		-- This is fairly similar to make_shared<iv[1]>(args...) (WHAT DO YOU KNOW, LUA IS LIKE C++??!?!)
+		for i,iv in ipairs(v.category.elements) do
+			local height = self[iv[1]](self, category.Content, unpack(iv, 2))
 			currentSize = currentSize + height
 		end
 
 		-- Rearrange all of the sub elements appropriately
 		local left, top, right, bottom = category.Widget:GetAnchorOffsets()
-		category.Widget:SetAnchorOffsets(left, startSize, right, startSize + currentSize)
+		category.Widget:SetAnchorOffsets(left, totalSize, right, totalSize + currentSize)
 		category.Content:ArrangeChildrenVert(Window.CodeEnumArrangeOrigin.Middle)
 
+		-- Add combined widget size
 		totalSize = totalSize + currentSize
 	end
 
-	parentForm:ArrangeChildrenTiles(0)
+	self.options:ArrangeChildrenTiles(0)
+end
+
+-----------------------------------------------------------------------------------------------
+function Options:InitInHeal(builder)
+-----------------------------------------------------------------------------------------------
+	local fontName = "nHealInFont"
+
+	local color = builder:AddCategory("Color")
+	color:AddElement(k_InitColor, "cHealInDefault",  "Normal",       fontName)
+	color:AddElement(k_InitColor, "cHealInCrit",     "Critical",     fontName)
+	color:AddElement(k_InitColor, "cHealInShield", 	 "Shield Heal",  fontName)
+
+	local text = builder:AddCategory("Text")
+	text:AddElement(k_InitFont, 	 fontName)
+	text:AddElement(k_InitPosition,  "nHealInPos")
+	text:AddElement(k_InitPattern,   "nHealInPattern")
+	text:AddElement(k_InitCollision, "nHealInCollision")
+
+	local scale = builder:AddCategory("Scale")
+	scale:AddElement(k_InitSlider, "fHealInNormalScale", "Normal Scale")
+	scale:AddElement(k_InitSlider, "fHealInCritScale", "Critical Scale")
+	scale:AddElement(k_InitSlider, "fHealInDuration",  "Duration")
+
+	local other = builder:AddCategory("Other")		
+	other:AddElement(k_InitValue, "iHealInThreshold", "Don't show any healing under this threshold")
+
+	return builder
+end
+
+-----------------------------------------------------------------------------------------------
+function Options:InitOutHeal(builder)
+-----------------------------------------------------------------------------------------------
+	local fontName = "nHealOutFont"
+
+	local color = builder:AddCategory("Color")
+	color:AddElement(k_InitColor, "cHealDefault",  "Normal",       fontName) 
+	color:AddElement(k_InitColor, "cHealCrit",     "Critical",     fontName)
+	color:AddElement(k_InitColor, "cHealMultiHit", "Multi Hit",    fontName)
+	color:AddElement(k_InitColor, "cHealShield",   "Shield Heal",  fontName) 
+
+	local text = builder:AddCategory("Text")
+	text:AddElement(k_InitFont, 	  fontName) 
+	text:AddElement(k_InitPosition,  "nHealOutPos") 
+	text:AddElement(k_InitPattern,   "nHealOutPattern")
+	text:AddElement(k_InitCollision, "nHealOutCollision")
+
+	local scale = builder:AddCategory("Scale")
+	scale:AddElement(k_InitSlider, "fHealOutNormalScale", "Normal Scale") 
+	scale:AddElement(k_InitSlider, "fHealOutCritScale",   "Critical Scale")
+
+	local other = builder:AddCategory("Other")
+	other:AddElement(k_InitValue,  "iHealOutThreshold",    "Don't show any healing under this threshold")
+
+	return builder
+end
+
+-----------------------------------------------------------------------------------------------
+function Options:InitOutDmg(builder)
+-----------------------------------------------------------------------------------------------
+	local fontName = "nDmgOutFont"
+
+	local color = builder:AddCategory("Color")
+	color:AddElement(k_InitColor, "cDmgDefault",   "Normal",        fontName) 
+	color:AddElement(k_InitColor, "cDmgCrit",      "Critical",      fontName)
+	color:AddElement(k_InitColor, "cDmgMultiHit",  "Multi Hit",     fontName)
+	color:AddElement(k_InitColor, "cDmgVuln",      "Vulnerability", fontName) 
+	color:AddElement(k_InitColor, "cDmgAbsorb",    "Absorb",        fontName)
+
+	local text = builder:AddCategory("Text")
+	text:AddElement(k_InitFont, 	  fontName) 
+	text:AddElement(k_InitPosition,  "nDmgOutPos") 
+	text:AddElement(k_InitPattern,   "nDmgOutPattern")
+	text:AddElement(k_InitCollision, "nDmgOutCollision")
+
+	local scale = builder:AddCategory("Scale")
+	scale:AddElement(k_InitSlider, "fDmgOutNormalScale", "Normal Scale") 
+	scale:AddElement(k_InitSlider, "fDmgOutCritScale",   "Critical Scale")
+	scale:AddElement(k_InitSlider, "fDmgOutDuration",    "Duration", {0, 10.0, 0.05})
+
+	local other = builder:AddCategory("Other")
+	other:AddElement(k_InitValue,     "iDmgBigCritOutValue", "Emphasize crits above this value") 
+	other:AddElement(k_InitValue,     "iDmgOutThreshold",    "Don't show any damage under this threshold")
+	other:AddElement(k_InitOptionBox, "bDmgOutMergeShield",  "Merge shield and regular damage into one number") 
+	other:AddElement(k_InitOptionBox, "bDmgOutShowAbsorb",   "Display absorbed damage differently than regular damage.")
+
+	return builder
+end
+
+-----------------------------------------------------------------------------------------------
+function Options:InitInDmg(builder)
+-----------------------------------------------------------------------------------------------
+	local fontName = "nDmgInFont"
+
+	local color = builder:AddCategory("Color")
+	color:AddElement(k_InitColor, "cDmgInDefault",  "Normal",    fontName) 
+	color:AddElement(k_InitColor, "cDmgInCrit",     "Critical",  fontName) 
+	color:AddElement(k_InitColor, "cDmgInAbsorb",   "Absorb",    fontName)
+
+	local text = builder:AddCategory("Text")
+	text:AddElement(k_InitFont, 	  fontName) 
+	text:AddElement(k_InitPosition,  "nDmgInPos") 
+	text:AddElement(k_InitPattern,   "nDmgInPattern")
+	text:AddElement(k_InitCollision, "nDmgInCollision")
+
+	local scale = builder:AddCategory("Scale")
+	scale:AddElement(k_InitSlider, "fDmgInNormalScale", "Normal Scale") 
+	scale:AddElement(k_InitSlider, "fDmgInCritScale",   "Critical Scale")
+	scale:AddElement(k_InitSlider, "fDmgInDuration",    "Duration")
+
+	return builder
+end
+
+-----------------------------------------------------------------------------------------------
+function Options:InitGeneral(builder)
+-----------------------------------------------------------------------------------------------
+	local other = builder:AddCategory("Other")
+	other:AddElement( k_InitOptionBox, "bShowZoneChange",     "Show zone changes.")
+	other:AddElement( k_InitOptionBox, "bShowRealmBroadcast", "Show realm broadcasts.")
+
+	return builder
 end
 
 -----------------------------------------------------------------------------------------------
@@ -373,9 +383,8 @@ end
 -----------------------------------------------------------------------------------------------
 function Options:OnOptionSelected( wndHandler, wndControl, eMouseButton )
 -----------------------------------------------------------------------------------------------
-	self.currentCategory = wndHandler:GetName():gsub("%s", "")
-	self.parent.tSettings.currentCategory = self.currentCategory
-	self:LoadCategory(self.currentCategory)
+	self.parent.tSettings.currentCategory = wndHandler:GetData().func
+	self:LoadCategory(self.parent.tSettings.currentCategory)
 end
 
 -----------------------------------------------------------------------------------------------
@@ -427,7 +436,7 @@ function Options:LoadSliderWidget(parentForm)
 end
 
 -----------------------------------------------------------------------------------------------
--- Helper function for loading a slider
+-- Helper function for loading an option box
 -----------------------------------------------------------------------------------------------
 function Options:LoadOptionBoxWidget(parentForm)
 -----------------------------------------------------------------------------------------------
@@ -435,7 +444,7 @@ function Options:LoadOptionBoxWidget(parentForm)
 end
 
 -----------------------------------------------------------------------------------------------
--- Helper function for loading a slider
+-- Helper function for loading a value widget
 -----------------------------------------------------------------------------------------------
 function Options:LoadValueWidget(parentForm)
 -----------------------------------------------------------------------------------------------
@@ -479,22 +488,6 @@ function Options:OnListPosChanged(wndHandler, wndControl)
 	data.callback(params.Idx)
 end
 
------------------------------------------------------------------------------------------------
--- Helper function for a category and resizing based on number of items requested
------------------------------------------------------------------------------------------------
-function Options:LoadCategoryWidget(parentForm, strName, params)
------------------------------------------------------------------------------------------------
-	local category = self:LoadWidget("ContentCategory", parentForm, { "Description", "Content" })
-	local categoryPadding = 2
-	local left, top, right, bottom = category.Widget:GetAnchorOffsets()
-	local size = categoryPadding + params.top + params.itemHeight * params.numItems + params.padding
-	category.Description:SetText(strName)
-	category.Widget:SetAnchorOffsets(left, params.top + categoryPadding, right, size)
-	
-	local tRet = { Size = size, Widget = category.Content }
-	return tRet
-end
-
 ---------------------------------------------------------------------------------------------------
 function PrintObject(o, filter)
 ---------------------------------------------------------------------------------------------------
@@ -506,6 +499,15 @@ function PrintObject(o, filter)
 		else
 			GoodPrint(key, "=", value)
 		end
+	end
+end
+
+---------------------------------------------------------------------------------------------------
+function PrintTable(tbl)
+---------------------------------------------------------------------------------------------------
+	if type(tbl) ~= "table" then return end
+	for k,v in pairs(tbl) do
+		GoodPrint(k,"=",v)
 	end
 end
 
@@ -615,20 +617,20 @@ end
 function Options:InitPatternWidget(parentForm, setting)
 -----------------------------------------------------------------------------------------------
 	self.textParams[k_InitPattern] = {}
-	self.textParams[k_InitPattern].Max = table.getn(patternList)
-	self.textParams[k_InitPattern].Idx = self:LookupIndex(patternList, self.parent.tSettings[setting])
+	self.textParams[k_InitPattern].Max = table.getn(self.patternList)
+	self.textParams[k_InitPattern].Idx = self:LookupIndex(self.patternList, self.parent.tSettings[setting])
 
 	local tParams = {
 		callback = function(nIdx)
-			local pattern = patternList[nIdx]
-			self.parent.tSettings[setting] = pattern
+			local pattern = self.patternList[nIdx]
+			self.parent.tSettings[setting] = "Pattern"..pattern
 			self.textParams[k_InitPattern].Widget.Current:SetText(pattern)
 		end,
 		name = k_InitPattern
 	}
 
 	local tWidget  = self:LoadListSelectionWidget(parentForm, tParams)
-	local pattern  = self.parent.tSettings[setting]
+	local pattern  = self.parent.tSettings[setting]:gsub("Pattern", "")
 	tWidget.Description:SetText("Pattern")
 	tWidget.Current:SetText(pattern)
 	tWidget.Current:SetTooltip("The pattern in which the text will move after it appears.")
@@ -814,6 +816,7 @@ function Options:OnColorPickerWidgetEditBoxChanged(wndHandler, wndControl)
 	local value = tonumber(text, 16) and text:len() == 6 and text or "ffffff"
 	local data = wndHandler:GetData()
 	
+	-- "ff" prepend because of alpha
 	data.preview:SetTextColor("ff"..value)
 	data.image:GetData().value = value
 	data.image:SetBGColor("ff"..value)
@@ -838,7 +841,9 @@ function Options:OnColorPressed(wndHandler, wndControl)
 	if Apollo.GetAddon("IronColorPicker") ~= nil then
 		Apollo.GetAddon("IronColorPicker"):ShowColor(data.value, callback)
 	else
-		ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_System, "Cannot open up color picker because you don't have the addon!", "IronCombatText")
+		ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_System, 
+									"Cannot open up color picker because you don't have the IronColorPicker addon!", 
+									"IronCombatText")
 	end
 end
 

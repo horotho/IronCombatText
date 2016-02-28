@@ -89,8 +89,40 @@ end
 function IronCombatText:GetDefaultSettings()
 ---------------------------------------------------------------------------------------------------
 	local tSettings = {}
-	
-	tSettings.bShowMultiHit      = true
+
+	-- tSettings["DamageOut"] = 
+	-- {
+	-- 	cNormal 	 = 0xf4e443,
+	-- 	cMulti  	 = 0x0088ff,
+	-- 	cCrit   	 = 0xfffb93,
+	-- 	cVuln   	 = 0xf5a2ff,
+	-- 	cAbsorb      = 0xffffff,
+	-- 	iBigCrit     = 10000,
+	-- 	iThreshold   = 0,
+	-- 	fNormalScale = 1.0,
+	-- 	fCritScale   = 1.25,
+	-- 	fDuration    = 1.25,
+	-- 	strPattern   = "PatternPopup",
+	-- 	strFont      = "CRB_FloaterMedium",
+	-- 	bMergeShield = true,
+	-- 	bShowAbsorb  = true,
+	-- 	ePos         = CombatFloater.CodeEnumFloaterLocation.Chest,
+	-- 	eCollision   = CombatFloater.CodeEnumFloaterCollisionMode.IgnoreCollision,		
+	-- }
+
+	-- tSettings["DamageIn"] = 
+	-- {
+	-- 	cNormal 	 = 0xff3333,
+	-- 	cCrit 		 = 0xff0000,
+	-- 	cAbsorb	     = 0xffffff,
+	-- 	fCritScale 	 = 1.1,
+	-- 	fNormalScale = 1.0,
+	-- 	fDuration    = 1.0,
+	-- 	nPattern     = "StreamDownLeft",
+	-- 	nFont        = "CRB_HeaderLarge",
+	-- 	eCollision   = CombatFloater.CodeEnumFloaterCollisionMode.IgnoreCollision,
+	-- 	ePos         = CombatFloater.CodeEnumFloaterLocation.Chest
+	-- }
 	
 	-- Damage Out
 	tSettings.cDmgDefault 		  = 0xf4e443
@@ -103,7 +135,7 @@ function IronCombatText:GetDefaultSettings()
 	tSettings.fDmgOutNormalScale  = 1.0
 	tSettings.fDmgOutCritScale 	  = 1.25
 	tSettings.fDmgOutDuration     = 1.25
-	tSettings.nDmgOutPattern      = "Default"
+	tSettings.nDmgOutPattern      = "PatternPopup"
 	tSettings.fDmgOutAlpha        = 1.0
 	tSettings.nDmgOutCollision    = CombatFloater.CodeEnumFloaterCollisionMode.IgnoreCollision
 	tSettings.bDmgOutMergeShield  = true
@@ -115,7 +147,8 @@ function IronCombatText:GetDefaultSettings()
 	tSettings.cDmgInAbsorb	      = 0xffffff
 	tSettings.fDmgInCritScale 	  = 1.1
 	tSettings.fDmgInNormalScale   = 1.0
-	tSettings.nDmgInPattern       = "Default"
+	tSettings.fDmgInDuration      = 1.0
+	tSettings.nDmgInPattern       = "PatternPopup"
 	tSettings.nDmgInCollision     = CombatFloater.CodeEnumFloaterCollisionMode.IgnoreCollision
 	
 	-- Heal Out
@@ -127,7 +160,7 @@ function IronCombatText:GetDefaultSettings()
 	tSettings.iHealOutThreshold   = 0
 	tSettings.fHealOutNormalScale = 1.0
 	tSettings.fHealOutCritScale   = 1.1
-	tSettings.nHealOutPattern     = "Default"
+	tSettings.nHealOutPattern     = "PatternPopup"
 	tSettings.nHealOutCollision   = CombatFloater.CodeEnumFloaterCollisionMode.IgnoreCollision
 	
 	-- Heal In
@@ -139,7 +172,8 @@ function IronCombatText:GetDefaultSettings()
 	tSettings.iHealInThreshold    = 0
 	tSettings.fHealInNormalScale  = 1.0
 	tSettings.fHealInCritScale    = 1.1
-	tSettings.nHealInPattern      = "Default"
+	tSettings.fHealInDuration     = 1.0
+	tSettings.nHealInPattern      = "PatternPopup"
 	tSettings.nHealInCollision    = CombatFloater.CodeEnumFloaterCollisionMode.IgnoreCollision
 	
 	-- Default fonts
@@ -154,12 +188,14 @@ function IronCombatText:GetDefaultSettings()
 	tSettings.nHealOutPos  = CombatFloater.CodeEnumFloaterLocation.Chest
 	tSettings.nHealInPos   = CombatFloater.CodeEnumFloaterLocation.Chest
 
+	-- Deflects
+	tSettings.cDeflect      = 0xdddddd
 
 	-- General options
 	tSettings.bShowRealmBroadcast = true
 	tSettings.bShowZoneChange = true
 	
-	tSettings.currentCategory = "General"
+	tSettings.currentCategory = "InitGeneral"
 	
 	return tSettings
 end
@@ -176,10 +212,8 @@ function IronCombatText:OnLoad()
 	end
 	
 	self.Utils.Init(self)
-	self.Options:Init(self)
 	self.Patterns:Init(self)
-	self.Options.tSettings = self.tSettings
-
+	self.Options:Init(self)
 	
 	-- Register handlers for events, slash commands and timer, etc.
 	-- e.g. Apollo.RegisterEventHandler("KeyDown", "OnKeyDown", self)
@@ -214,7 +248,7 @@ function IronCombatText:OnLoad()
 
 	-- set the max count of floater text
 	CombatFloater.SetMaxFloaterCount(200)
-	CombatFloater.SetMaxFloaterPerUnitCount(50)
+	CombatFloater.SetMaxFloaterPerUnitCount(100)
 
 	-- float text queue for delayed text
 	self.tDelayedFloatTextQueue = Queue:new()
@@ -508,67 +542,32 @@ end
 function IronCombatText:OnFloaterMultiHit(tEventArgs)
 ---------------------------------------------------------------------------------------------------
 	local bCritical = tEventArgs.eCombatResult == GameLib.CodeEnumCombatResult.Critical
-	if tEventArgs.unitCaster == GameLib.GetControlledUnit() then -- Target does the transference to the source
-		self:OnDamageOrHealing( 
-								tEventArgs.unitCaster, 
-								tEventArgs.unitTarget, 
-								tEventArgs.eDamageType, 
-								math.abs(tEventArgs.nDamageAmount), 
-								math.abs(tEventArgs.nShield),
-								math.abs(tEventArgs.nAbsorption),
-								bCritical,
-								tEventArgs.splCallingSpell:GetName(),
-								true 
-							  )
-	else -- creature taking damage
-		self:OnPlayerDamageOrHealing( 
-									  tEventArgs.unitTarget,
-								 	  tEventArgs.eDamageType, 
-									  math.abs(tEventArgs.nDamageAmount), 
-								      math.abs(tEventArgs.nShield),
-								      math.abs(tEventArgs.nAbsorption),
-									  bCritical,
-									  tEventArgs.splCallingSpell:GetName(),
-								      true 
-								    )
-	end
+	self:OnDamageOrHealing( 
+							tEventArgs.unitCaster, 
+							tEventArgs.unitTarget, 
+							tEventArgs.eDamageType, 
+							math.abs(tEventArgs.nDamageAmount), 
+							math.abs(tEventArgs.nShield),
+							math.abs(tEventArgs.nAbsorption),
+							bCritical,
+							tEventArgs.splCallingSpell:GetName(),
+							true 
+						  )
 end
 
 ---------------------------------------------------------------------------------------------------
 function IronCombatText:OnFloaterMultiHeal(tEventArgs)
 ---------------------------------------------------------------------------------------------------
 	local bCritical = tEventArgs.eCombatResult == GameLib.CodeEnumCombatResult.Critical
-	if tEventArgs.unitTarget == GameLib.GetPlayerUnit() then -- source recieves the transference from the taker
-		self:OnPlayerDamageOrHealing(
-								      tEventArgs.unitCaster, 
-									  GameLib.CodeEnumDamageType.Heal, 
-									  math.abs(tEventArgs.nHealAmount), 
-									  0, 
-									  0,
-									  bCritical,
-									  tEventArgs.splCallingSpell:GetName(), 
-									  true 
-									)
-	else
-		self:OnDamageOrHealing( 
-		                        tEventArgs.unitCaster, 
-		                        tEventArgs.unitTarget, 
-								GameLib.CodeEnumDamageType.Heal, 
-								math.abs(tEventArgs.nHealAmount), 
-								0, 
-								0, 
-								bCritical, 
-								tEventArgs.splCallingSpell:GetName(), 
-								true 
-							  )
-	end
+	self:OnDamageOrHealing( tEventArgs.unitCaster, tEventArgs.unitTarget, GameLib.CodeEnumDamageType.Heal, 
+							math.abs(tEventArgs.nHealAmount), 0, 0, bCritical, tEventArgs.splCallingSpell:GetName(), 
+							true )
 end
 
 ---------------------------------------------------------------------------------------------------
 function IronCombatText:OnFloaterTransference(tEventArgs)
 ---------------------------------------------------------------------------------------------------
 	local bCritical = tEventArgs.eCombatResult == GameLib.CodeEnumCombatResult.Critical
-	if tEventArgs.unitCaster == GameLib.GetControlledUnit() then -- Target does the transference to the source
 		self:OnDamageOrHealing( tEventArgs.unitCaster, 
 								tEventArgs.unitTarget, 
 								tEventArgs.eDamageType, 
@@ -578,43 +577,19 @@ function IronCombatText:OnFloaterTransference(tEventArgs)
 								"FloaterTransference", 
 								bCritical,
 								false )
-	else -- creature taking damage
-		self:OnPlayerDamageOrHealing( 
-		tEventArgs.unitTarget, 
-		tEventArgs.eDamageType, 
-		math.abs(tEventArgs.nDamageAmount),
-		math.abs(tEventArgs.nShield), 
-		math.abs(tEventArgs.nAbsorption), 
-		bCritical, 
-		"FloaterTransference", 
-		false )
-	end
 
 	-- healing data is stored in a table where each subtable contains a different vital that was healed
 	-- units in caster's group can get healed
 	for idx, tHeal in ipairs(tEventArgs.tHealData) do
-		if tHeal.unitHealed == GameLib.GetPlayerUnit() then -- source recieves the transference from the taker
-			self:OnPlayerDamageOrHealing(
-			tEventArgs.unitCaster, 
-			GameLib.CodeEnumDamageType.Heal, 
-			math.abs(tHeal.nHealAmount), 
-			0, 
-			0, 
-			bCritical,
-		    "FloaterTransference", 
-		    false )
-		else
-			self:OnDamageOrHealing( 
-			tEventArgs.unitCaster, 
-			tHeal.unitHealed, 
-			tEventArgs.eDamageType, 
-			math.abs(tHeal.nHealAmount), 
-			0, 
-			0, 
-			bCritical, 
-			"FloaterTransference", 
-			false )
-		end
+		self:OnDamageOrHealing( tEventArgs.unitCaster, 
+								tHeal.unitHealed, 
+								tEventArgs.eDamageType, 
+								math.abs(tHeal.nHealAmount), 
+								0, 
+								0, 
+								bCritical, 
+								"FloaterTransference", 
+								false )
 	end
 end
 
@@ -967,11 +942,39 @@ function IronCombatText:OnMiss( unitCaster, unitTarget, eMissType )
 end
 
 ------------------------------------------------------------------------------------------------------------------------------
+function IronCombatText:OnDamageOrHealing( unitCaster, unitTarget, eDamageType, nDamage, nShieldDamaged, nAbsorptionAmount, bCritical, strName, bMultiHit)
+------------------------------------------------------------------------------------------------------------------------------
+	if unitTarget == nil or not Apollo.GetConsoleVariable("ui.showCombatFloater") or nDamage == nil then
+		return
+	end
+
+	local bIsHealing = eDamageType == GameLib.CodeEnumDamageType.Heal or eDamageType == GameLib.CodeEnumDamageType.HealShields
+	local bIsPlayer =    GameLib.IsControlledUnit(unitTarget) 
+				      or unitTarget == GameLib.GetPlayerMountUnit()
+				      or GameLib.IsControlledUnit(unitTarget:GetUnitOwner()) 
+				      or unitTarget == GameLib.GetPlayerUnit()
+					
+	if  bIsPlayer then
+		if bIsHealing then
+			self:OnIncomingHealing(unitTarget, eDamageType, nDamage, nShieldDamaged, nAbsorptionAmount, bCritical)
+		else
+			self:OnIncomingDamage(unitTarget, eDamageType, nDamage, nShieldDamaged, nAbsorptionAmount, bCritical)
+		end
+	else
+		if bIsHealing then
+			self:OnOutgoingHealing(unitCaster, unitTarget, eDamageType, nDamage, nShieldDamaged, nAbsorptionAmount, bCritical, bMultiHit)
+		else
+			self:OnOutgoingDamage(unitCaster, unitTarget, nDamage, nShieldDamaged, nAbsorptionAmount, bCritical, bMultiHit)
+		end
+	end
+end
+
+------------------------------------------------------------------------------------------------------------------------------
 -- Helper function for displaying healing
 ------------------------------------------------------------------------------------------------------------------------------
 function IronCombatText:OnOutgoingHealing( unitCaster, unitTarget, eDamageType, nDamage, nShieldDamage, nAbsorp, bCritical, bMultiHit)
 -----------------------------------------------------------------------------------------------------------------------------
-	if (nDamage + nShieldDamage) < self.tSettings.iHealOutThreshold then
+	if (nDamage + nShieldDamage) <= self.tSettings.iHealOutThreshold then
 		return
 	end
 	
@@ -1026,7 +1029,7 @@ end
 function IronCombatText:OnOutgoingDamage( unitCaster, unitTarget, nDamage, nShieldDamage, nAbsorb, bCritical, bMultiHit)
 -----------------------------------------------------------------------------------------------------------------------------	
 	-- Don't do anything if under damage threshold
-	if (nDamage + nShieldDamage) < self.tSettings.iDmgOutThreshold then
+	if (nDamage + nShieldDamage) <= self.tSettings.iDmgOutThreshold then
 		return
 	end
 
@@ -1046,7 +1049,7 @@ function IronCombatText:OnOutgoingDamage( unitCaster, unitTarget, nDamage, nShie
 		
 		if nTotalDamage >= self.tSettings.iDmgBigCritOutValue then
 			fBigDmgScale = 1.25
-			fMaxDuration = fMaxDuration * 1.4
+			fMaxDuration = fMaxDuration * 2
 		end
 	end
 	
@@ -1092,36 +1095,6 @@ function IronCombatText:OnOutgoingDamage( unitCaster, unitTarget, nDamage, nShie
 	
 end
 
-------------------------------------------------------------------------------------------------------------------------------
-function IronCombatText:OnDamageOrHealing( unitCaster, unitTarget, eDamageType, nDamage, nShieldDamaged, nAbsorptionAmount, bCritical, strName, bMultiHit)
-------------------------------------------------------------------------------------------------------------------------------
-	if unitTarget == nil or not Apollo.GetConsoleVariable("ui.showCombatFloater") or nDamage == nil then
-		return
-	end
-	
-	--[[
-	Print("IsControlledUnit="..(GameLib.IsControlledUnit(unitTarget) and "true" or "false"))
-	Print("IsMount="..(unitTarget == GameLib.GetPlayerMountUnit() and "true" or "false"))
-	Print("IsOwnerControlled="..(GameLib.IsControlledUnit(unitTarget:GetUnitOwner()) and "true" or "false"))
-	--]]
-
-	if GameLib.IsControlledUnit(unitTarget) or unitTarget == GameLib.GetPlayerMountUnit() or GameLib.IsControlledUnit(unitTarget:GetUnitOwner()) then
-		self:OnPlayerDamageOrHealing( unitTarget, eDamageType, nDamage, nShieldDamaged, nAbsorptionAmount, bCritical )
-		return
-	end
-	
-	
-	if eDamageType == GameLib.CodeEnumDamageType.Heal or eDamageType == GameLib.CodeEnumDamageType.HealShields then
-		self:OnOutgoingHealing(unitCaster, unitTarget, eDamageType, nDamage, nShieldDamaged, nAbsorptionAmount, bCritical, bMultiHit)
-		return
-	else
-		self:OnOutgoingDamage(unitCaster, unitTarget, nDamage, nShieldDamaged, nAbsorptionAmount, bCritical, bMultiHit)
-		return
-	end
-	
-end
-
-
 ------------------------------------------------------------------
 function IronCombatText:OnIncomingDamage( unitPlayer, eDamageType, nDamage, nShieldDamage, nAbsorb, bCritical )
 ------------------------------------------------------------------	
@@ -1130,7 +1103,7 @@ function IronCombatText:OnIncomingDamage( unitPlayer, eDamageType, nDamage, nShi
 	local nBaseColor 	= self.tSettings.cDmgInDefault
 	local fMaxSize		= self.tSettings.fDmgInNormalScale
 	local fCritScale 	= self.tSettings.fDmgInCritScale
-	local fMaxDuration 	= 1.25
+	local fMaxDuration 	= self.tSettings.fDmgInDuration
 	local fBigCritScale = 1.0
 	local nTotalDamage 	= nDamage + nShieldDamage
 	
@@ -1174,7 +1147,7 @@ end
 
 ------------------------------------------------------------------
 function IronCombatText:OnIncomingHealing( unitPlayer, eDamageType, nDamage, nShieldDamage, nAbsorb, bCritical )
-	if (nDamage + nShieldDamage) < self.tSettings.iHealInThreshold then
+	if (nDamage + nShieldDamage) <= self.tSettings.iHealInThreshold then
 		return
 	end
 	
@@ -1182,7 +1155,7 @@ function IronCombatText:OnIncomingHealing( unitPlayer, eDamageType, nDamage, nSh
 	
 	local nBaseColor 	= self.tSettings.cHealInDefault
 	local fMaxSize 		= self.tSettings.fHealInNormalScale
-	local fMaxDuration 	= 1.25
+	local fMaxDuration 	= self.tSettings.fHealInDuration
 	local fBigCritScale = 1.0
 	local nTotalDamage 	= nDamage + nShieldDamage
 	
@@ -1221,122 +1194,6 @@ function IronCombatText:OnIncomingHealing( unitPlayer, eDamageType, nDamage, nSh
 	end
 
 
-end
-
-------------------------------------------------------------------
-function IronCombatText:OnPlayerDamageOrHealing(unitPlayer, eDamageType, nDamage, nShieldDamaged, nAbsorptionAmount, bCritical, strSpellName)
-	if unitPlayer == nil or not Apollo.GetConsoleVariable("ui.showCombatFloater") then
-		return
-	end
-
-	-- If there is no damage, don't show a floater
-	if nDamage == nil then
-		return
-	end
-	
-	if eDamageType == GameLib.CodeEnumDamageType.Heal or eDamageType == GameLib.CodeEnumDamageType.HealShields then
-		self:OnIncomingHealing(unitPlayer, eDamageType, nDamage, nShieldDamaged, nAbsorptionAmount, bCritical)
-		return
-	else
-		self:OnIncomingDamage(unitPlayer, eDamageType, nDamage, nShieldDamaged, nAbsorptionAmount, bCritical)
-		return
-	end
-
-	--[[
-	local bShowFloater = true
-	local tTextOption = self:GetDefaultTextOption()
-	local tTextOptionAbsorb = self:GetDefaultTextOption()
-
-	tTextOption.arFrames = {}
-	tTextOptionAbsorb.arFrames = {}
-
-	local nStallTime = .3
-
-	if type(nAbsorptionAmount) == "number" and nAbsorptionAmount > 0 then --absorption is its own separate type
-		tTextOptionAbsorb.nColor = 0xf8f3d7
-		tTextOptionAbsorb.eCollisionMode = CombatFloater.CodeEnumFloaterCollisionMode.Horizontal --Vertical--Horizontal  --IgnoreCollision
-		tTextOptionAbsorb.eLocation = CombatFloater.CodeEnumFloaterLocation.Chest
-		tTextOptionAbsorb.fOffset = -0.4
-		tTextOptionAbsorb.fOffsetDirection = 0--125
-
-		-- scale and movement
-		tTextOptionAbsorb.arFrames =
-		{
-			[1] = {fScale = 1.1,	fTime = 0,									fVelocityDirection = 0,		fVelocityMagnitude = 0,},
-			[2] = {fScale = 0.7,	fTime = 0.05,				fAlpha = 1.0,},
-			[3] = {fScale = 0.7,	fTime = .2 + nStallTime,	fAlpha = 1.0,	fVelocityDirection = 180,	fVelocityMagnitude = 3,},
-			[4] = {fScale = 0.7,	fTime = .45 + nStallTime,	fAlpha = 0.2,	fVelocityDirection = 180,},
-		}
-	end
-
-	local bHeal = eDamageType == GameLib.CodeEnumDamageType.Heal or eDamageType == GameLib.CodeEnumDamageType.HealShields
-	local nBaseColor = 0xff6d6d
-	local nHighlightColor = 0xff6d6d
-	local fMaxSize = 0.8
-	local nOffsetDirection = 0
-	local fOffsetAmount = -0.6
-	local fMaxDuration = .55
-	local eCollisionMode = CombatFloater.CodeEnumFloaterCollisionMode.Horizontal
-
-	if eDamageType == GameLib.CodeEnumDamageType.Heal then -- healing params
-		nBaseColor = 0xb0ff6a
-		nHighlightColor = 0xb0ff6a
-		fOffsetAmount = -0.5
-
-		if bCritical then
-			fMaxSize = 1.2
-			nBaseColor = 0xc6ff94
-			nHighlightColor = 0xc6ff94
-			fMaxDuration = .75
-		end
-
-	elseif eDamageType == GameLib.CodeEnumDamageType.HealShields then -- healing shields params
-		nBaseColor = 0x6afff3
-		fOffsetAmount = -0.5
-		nHighlightColor = 0x6afff3
-
-		if bCritical then
-			fMaxSize = 1.2
-			nBaseColor = 0xa6fff8
-			nHighlightColor = 0xFFFFFF
-			fMaxDuration = .75
-		end
-
-	else -- regular old damage (player)
-		fOffsetAmount = -0.5
-
-		if bCritical then
-			fMaxSize = 1.2
-			nBaseColor = 0xffab3d
-			nHighlightColor = 0xFFFFFF
-			fMaxDuration = .75
-		end
-	end
-
-	tTextOptionAbsorb.fOffset = fOffsetAmount
-	tTextOption.eCollisionMode = eCollisionMode
-	tTextOption.eLocation = CombatFloater.CodeEnumFloaterLocation.Chest
-
-	-- scale and movement
-	tTextOption.arFrames =
-	{
-		[1] = {fScale = fMaxSize * .75,	fTime = 0,									nColor = nHighlightColor,	fVelocityDirection = 0,		fVelocityMagnitude = 0,},
-		[2] = {fScale = fMaxSize * 1.5,	fTime = 0.05,								nColor = nHighlightColor,	fVelocityDirection = 0,		fVelocityMagnitude = 0,},
-		[3] = {fScale = fMaxSize,		fTime = 0.1,				fAlpha = 1.0,	nColor = nBaseColor,},
-		[4] = {							fTime = 0.3 + nStallTime,	fAlpha = 1.0,								fVelocityDirection = 180,	fVelocityMagnitude = 3,},
-		[5] = {							fTime = 0.65 + nStallTime,	fAlpha = 0.2,								fVelocityDirection = 180,},
-	}
-
-	if type(nAbsorptionAmount) == "number" and nAbsorptionAmount > 0 then -- secondary "if" so we don't see absorption and "0"
-		CombatFloater.ShowTextFloater( unitPlayer, String_GetWeaselString(Apollo.GetString("FloatText_Absorbed"), nAbsorptionAmount), tTextOptionAbsorb )
-	end
-
-	if nDamage > 0 and bHeal then
-		CombatFloater.ShowTextFloater( unitPlayer, String_GetWeaselString(Apollo.GetString("FloatText_PlusValue"), nDamage), tTextOption )
-	elseif not bHeal then
-		CombatFloater.ShowTextFloater( unitPlayer, nDamage, nShieldDamaged, tTextOption )
-	end
-	--]]
 end
 
 ------------------------------------------------------------------

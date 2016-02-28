@@ -3,63 +3,64 @@ require "CombatFloater"
 local Patterns = {}
 local IronCombatText = Apollo.GetAddon("IronCombatText")
 
-local tPatterns = 
-{
-	Circular        = function(...) return Patterns:PatternCircular        (...) end,
-	Default         = function(...) return Patterns:PatternDefault         (...) end,
-	StreamUpRight   = function(...) return Patterns:PatternStreamUpRight   (...) end,
-	StreamDownRight = function(...) return Patterns:PatternStreamDownRight (...) end,
-	StreamUpLeft    = function(...) return Patterns:PatternStreamUpLeft    (...) end,
-	StreamDownLeft  = function(...) return Patterns:PatternStreamDownLeft  (...) end,
-	StraightUp      = function(...) return Patterns:PatternStraightUp      (...) end,
-	StraightDown    = function(...) return Patterns:PatternStraightDown    (...) end,
-	Test            = function(...) return Patterns:PatternTest            (...) end,
-}
+---------------------------------------------------------------------------------------------------
+-- Constants
+---------------------------------------------------------------------------------------------------
+local k_White = 0xffffff
+local k_FrameCount = 8
+local k_HalfFrameCount = 4
+
+---------------------------------------------------------------------------------------------------
+-- Local Functions
+---------------------------------------------------------------------------------------------------
+local function step(nCurrent, nStep, funcBefore, funcAfter)
+	return (nCurrent < nStep) and funcBefore or funcAfter 
+end
+
+local function linearDown(nCurrentStep, nStep, nMax)
+	return (nMax - (nCurrentStep - nStep)/k_FrameCount) * nMax
+end
 
 ---------------------------------------------------------------------------------------------------
 function Patterns:Init(parent)
 ---------------------------------------------------------------------------------------------------
 	Apollo.LinkAddon(parent, self)
 	self.parent = parent
+	self.tick = 0
 end
 
 ---------------------------------------------------------------------------------------------------
 function Patterns:GeneratePattern(strPatternName, tParams)
 ---------------------------------------------------------------------------------------------------
+	self.tick = (self.tick + 15) % 360
+
+	-- Set all of the variables that are the same for each pattern
 	local tGenerated = self.parent:GetDefaultTextOption()
 	tGenerated.bShowOnTop 		= true
 	tGenerated.eCollisionMode 	= tParams.eCollisionMode
 	tGenerated.strFontFace 		= tParams.strFontFace
 	tGenerated.eLocation 		= tParams.eLocation
-	return tPatterns[strPatternName](tParams, tGenerated)
-end
-
-
-local function GrowToMax(nTime, nMax)
-	return (nTime < 4) and (nMax * math.log(nTime)) or nMax
-end	
-
-
-
-function Patterns:PatternTest(tParams, tGenerated)
-	local fVelocityDirection = math.random(0, 50) - 25
-	tGenerated.fOffsetDirection = 270
-	tGenerated.fOffset = math.random(0,6) - 3
 	tGenerated.arFrames = {}
 
-	for i = 0, 10 do
-		tGenerated.arFrames[i] = 
+
+	local fBigSize = tParams.fMaxSize * tParams.fBigScale
+
+	-- Prepopulate these pattern fields, as they do not change between patterns
+	for i = 0, k_FrameCount do
+		tGenerated.arFrames[i+1] = 
 		{
-			fScale 	= GrowToMax(i + 1, tParams.fMaxSize),
-			fTime 	= i * 0.1 * tParams.fMaxDuration,
-			fAlpha 	= 1,
-			fVelocityDirection = fVelocityDirection,
-			fVelocityMagnitude = -(i-4)^2+6,
-			nColor = tParams.nBaseColor 
+			-- On even frames, larger text if crit
+			fScale 	= step(i, 1, tParams.fMaxSize * 0.5, i % 2 == 0 and tParams.fMaxSize or fBigSize),
+			-- Each frame is an equal fraction of max duration
+			fTime 	= (i/k_FrameCount) * tParams.fMaxDuration,
+			-- Decrease alpha to zero starting at frame 5
+			fAlpha 	= linearDown(i, 5, 1),
+			-- White for 1 frame, then base color
+			nColor = step(i, 1, k_White, tParams.nBaseColor)
 		}
 	end
-
-	return tGenerated
+	
+	return self[strPatternName](self, tParams, tGenerated)
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -69,23 +70,18 @@ end
 --      123             123
 --          123     123
 ---------------------------------------------------------------------------------------------------
-function Patterns:PatternCircular(tParams, tGenerated)
+function Patterns:PatternSprinkler(tParams, tGenerated)
 ---------------------------------------------------------------------------------------------------
-	tGenerated.fOffsetDirection = math.random(0, 360)
-	tGenerated.fOffset 		 	= math.random(10, 100)/100
-	tGenerated.arFrames =
-	{
-		[1] = {fScale = (tParams.fMaxSize) * 0.8,	 		  fTime = 0,			        fVelocityDirection = tGenerated.fOffsetDirection, fVelocityMagnitude = 5, nColor = tParams.nBaseColor,	},
-		[2] = {fScale = tParams.fMaxSize,			  		  fTime = .15,					fAlpha = 1.0,},   
-		[3] = {fScale = tParams.fMaxSize * tParams.fBigScale, fTime = .3,		    		fAlpha = 0.95,},
-		[4] = {fScale = tParams.fMaxSize,			  	      fTime = .5,					fAlpha = 0.9,},
-		[5] = {fScale = tParams.fMaxSize * tParams.fBigScale, fTime = 0.75, 				fAlpha = 0.8 },
-		[6] = {								  				  fTime = tParams.fMaxDuration,	fAlpha = 0.0,},
-	}
-	
+	tGenerated.fOffsetDirection = self.tick
+	tGenerated.fOffset 		 	= 2
+
+	for i = 0, k_FrameCount do
+		tGenerated.arFrames[i+1].fVelocityDirection = tGenerated.fOffsetDirection
+		tGenerated.arFrames[i+1].fVelocityMagnitude = step(i, 2, 6, step(i, 6, 1, 6))
+	end
+
 	return tGenerated
 end
-
 
 ---------------------------------------------------------------------------------------------------
 --       ^ 123  123  123 ^
@@ -95,17 +91,28 @@ end
 function Patterns:PatternDefault(tParams, tGenerated)
 ---------------------------------------------------------------------------------------------------
 	tGenerated.fOffsetDirection = math.random(0, 100) - 50
-	tGenerated.fOffset 	     	= math.random(10, 100)/100
-	tGenerated.arFrames =
-	{
-		[1] = {fScale = (tParams.fMaxSize) * 0.8,	          fTime = 0,			        fVelocityDirection = tGenerated.fOffsetDirection, fVelocityMagnitude = 5, nColor = tParams.nBaseColor,	},
-		[2] = {fScale = tParams.fMaxSize,			          fTime = .15,			        fAlpha = 1.0,},   
-		[3] = {fScale = tParams.fMaxSize * tParams.fBigScale, fTime = .3,		            fAlpha = 0.95,},
-		[4] = {fScale = tParams.fMaxSize,			          fTime = .5,			        fAlpha = 0.9,},
-		[5] = {fScale = tParams.fMaxSize * tParams.fBigScale, fTime = 0.75, 		        fAlpha = 0.8 },
-		[6] = {								                  fTime = tParams.fMaxDuration,	fAlpha = 0.0,},
-	}
-	
+	tGenerated.fOffset 	     	= 0
+	local speed = tParams.fBigScale > 1 and 10 or 6
+
+	for i = 0, k_FrameCount do
+		tGenerated.arFrames[i+1].fVelocityDirection = tGenerated.fOffsetDirection
+		tGenerated.arFrames[i+1].fVelocityMagnitude = step(i, 2, speed, step(i, 5, 1, 6))
+	end
+	return tGenerated
+end
+
+---------------------------------------------------------------------------------------------------
+function Patterns:PatternPopup(tParams, tGenerated)
+---------------------------------------------------------------------------------------------------
+	tGenerated.fOffsetDirection = 90
+	tGenerated.fOffset 			= math.random(0,8) - 4
+	local s1 = math.random(8, 10)
+
+	for i = 0, k_FrameCount do
+		tGenerated.arFrames[i+1].fVelocityDirection = step(i, 6, 0, 180)
+		tGenerated.arFrames[i+1].fVelocityMagnitude = step(i, 2, s1, step(i, 6, 1, 6))
+	end
+
 	return tGenerated
 end
 
@@ -119,19 +126,14 @@ end
 ---------------------------------------------------------------------------------------------------
 function Patterns:PatternStreamUpRight(tParams, tGenerated)
 ---------------------------------------------------------------------------------------------------
-	tGenerated.fOffsetDirection = math.random(200,220) -- 5 o'clock
-	tGenerated.fOffset 		 	= math.random(15,35)/10
-	
-	tGenerated.arFrames =
-	{
-		[1] = {fScale = tParams.fMaxSize * 0.8,	        		fTime = 0,			fVelocityDirection = -45, fVelocityMagnitude = 5,						nColor = tParams.nBaseColor,	},
-		[2] = {fScale = tParams.fMaxSize,						fTime = .15,		fVelocityDirection = -30, fVelocityMagnitude = 5,	fAlpha = 1.0,							},
-		[3] = {fScale = tParams.fMaxSize * tParams.fBigScale,	fTime = .30,		fVelocityDirection = -15, fVelocityMagnitude = 5,						nColor = tParams.nBaseColor,	},
-		[4] = {fScale = tParams.fMaxSize,						fTime = .45,		fVelocityDirection = 15,  fVelocityMagnitude = 5,	fAlpha = 0.85,						},
-		[5] = {fScale = tParams.fMaxSize * tParams.fBigScale,	fTime = .75,		fVelocityDirection = 30,  fVelocityMagnitude = 5,	fAlpha = 0.65,						},
-		[6] = {													fTime = tParams.fMaxDuration,													fAlpha = 0.0,							},
-	}
-	
+	tGenerated.fOffsetDirection = math.random(200,210) -- 5 o'clock
+	tGenerated.fOffset 		 	= 3
+	local speed = tParams.fBigScale > 1.1 and 10 or 6
+
+	for i = 0, k_FrameCount do
+		tGenerated.arFrames[i+1].fVelocityDirection = step(i, k_HalfFrameCount, -20, 20)
+		tGenerated.arFrames[i+1].fVelocityMagnitude = step(i, 2, speed, step(i, 5, 2, 6))
+	end
 	return tGenerated
 end
 
@@ -145,96 +147,78 @@ end
 ---------------------------------------------------------------------------------------------------
 function Patterns:PatternStreamDownRight(tParams, tGenerated)
 ---------------------------------------------------------------------------------------------------
-	tGenerated.fOffsetDirection = math.random(340,355) -- 5 o'clock
-	tGenerated.fOffset			= math.random(30,50)/10
-	
-	tGenerated.arFrames =
-	{
-		[1] = {fScale = tParams.fMaxSize * 0.8,	       			fTime = 0,			fVelocityDirection = 230, 	fVelocityMagnitude = 5,						nColor = tParams.nBaseColor,	},
-		[2] = {fScale = tParams.fMaxSize,						fTime = .15,		fVelocityDirection = 215, 	fVelocityMagnitude = 5,	fAlpha = 1.0,							},
-		[3] = {fScale = tParams.fMaxSize * tParams.fBigScale,	fTime = .30,		fVelocityDirection = 200, 	fVelocityMagnitude = 5,						nColor = tParams.nBaseColor,	},
-		[4] = {fScale = tParams.fMaxSize,						fTime = .45,		fVelocityDirection = -200,  fVelocityMagnitude = 5,	fAlpha = 0.85,						},
-		[5] = {fScale = tParams.fMaxSize * tParams.fBigScale,	fTime = .75,		fVelocityDirection = -215,  fVelocityMagnitude = 5,	fAlpha = 0.65,						},
-		[6] = {													fTime = tParams.fMaxDuration,													fAlpha = 0.0,							},
-	}
-	
+	tGenerated.fOffsetDirection = math.random(330,340) -- 5 o'clock
+	tGenerated.fOffset 		 	= 2
+	local speed = tParams.fBigScale > 1 and 10 or 6
+
+	for i = 0, k_FrameCount do
+		tGenerated.arFrames[i+1].fVelocityDirection = step(i, k_HalfFrameCount, 200, -200)
+		tGenerated.arFrames[i+1].fVelocityMagnitude = step(i, 2, speed, step(i, 5, 1, 6))
+	end
 	return tGenerated
 end
 
 ---------------------------------------------------------------------------------------------------
 function Patterns:PatternStreamDownLeft(tParams, tGenerated)
 ---------------------------------------------------------------------------------------------------
-	tGenerated.fOffsetDirection = math.random(20,40) -- 5 o'clock
-	tGenerated.fOffset 			= math.random(30,50)/10
+	tGenerated.fOffsetDirection = math.random(20,30) -- 5 o'clock
+	tGenerated.fOffset 		 	= 2
+	local speed = tParams.fBigScale > 1 and 10 or 6
 
-	tGenerated.arFrames =
-	{
-		[1] = {fScale = tParams.fMaxSize * 0.8,	        		fTime = 0,			fVelocityDirection = 145, 	fVelocityMagnitude = 5,						nColor = tParams.nBaseColor,	},
-		[2] = {fScale = tParams.fMaxSize,						fTime = .15,		fVelocityDirection = 160, 	fVelocityMagnitude = 5,	fAlpha = 1.0,							},
-		[3] = {fScale = tParams.fMaxSize * tParams.fBigScale,	fTime = .30,		fVelocityDirection = 175, 	fVelocityMagnitude = 5,						nColor = tParams.nBaseColor,	},
-		[4] = {fScale = tParams.fMaxSize,						fTime = .45,		fVelocityDirection = -175,  fVelocityMagnitude = 5,	fAlpha = 0.85,						},
-		[5] = {fScale = tParams.fMaxSize * tParams.fBigScale,	fTime = .75,		fVelocityDirection = -160,  fVelocityMagnitude = 5,	fAlpha = 0.65,						},
-		[6] = {													fTime = tParams.fMaxDuration,													fAlpha = 0.0,							},
-	}
-	
+	for i = 0, k_FrameCount do
+		tGenerated.arFrames[i+1].fVelocityDirection = step(i, k_HalfFrameCount, 160, -160)
+		tGenerated.arFrames[i+1].fVelocityMagnitude = step(i, 2, speed, step(i, 5, 1, 6))
+	end
 	return tGenerated
 end
 
 ---------------------------------------------------------------------------------------------------
 function Patterns:PatternStreamUpLeft(tParams, tGenerated)
 ---------------------------------------------------------------------------------------------------
-	tGenerated.fOffsetDirection = math.random(130,160) -- 5 o'clock
-	tGenerated.fOffset          = math.random(20,40)/10
-	
-	tGenerated.arFrames =
-	{
-		[1] = {fScale = tParams.fMaxSize * 0.8,	        		fTime = 0,			fVelocityDirection = 45, fVelocityMagnitude = 5,						nColor = tParams.nBaseColor,	},
-		[2] = {fScale = tParams.fMaxSize,						fTime = .15,		fVelocityDirection = 30, fVelocityMagnitude = 5,	fAlpha = 1.0,							},
-		[3] = {fScale = tParams.fMaxSize * tParams.fBigScale,	fTime = .30,		fVelocityDirection = 15, fVelocityMagnitude = 5,						nColor = tParams.nBaseColor,	},
-		[4] = {fScale = tParams.fMaxSize,						fTime = .45,		fVelocityDirection = -15,  fVelocityMagnitude = 5,	fAlpha = 0.85,						},
-		[5] = {fScale = tParams.fMaxSize * tParams.fBigScale,	fTime = .75,		fVelocityDirection = -30,  fVelocityMagnitude = 5,	fAlpha = 0.65,						},
-		[6] = {													fTime = tParams.fMaxDuration,											fAlpha = 0.0,							},
-	}
-	
+	tGenerated.fOffsetDirection = math.random(150,160) -- 5 o'clock
+	tGenerated.fOffset 		 	= 2
+	local speed = tParams.fBigScale > 1 and 10 or 6
+
+	for i = 0, k_FrameCount do
+		tGenerated.arFrames[i+1].fVelocityDirection = step(i, k_HalfFrameCount, 20, -20)
+		tGenerated.arFrames[i+1].fVelocityMagnitude = step(i, 2, speed, step(i, 5, 1, 6))
+	end
 	return tGenerated
 end
+
 
 ---------------------------------------------------------------------------------------------------
 function Patterns:PatternStraightUp(tParams, tGenerated)
 ---------------------------------------------------------------------------------------------------
-	tGenerated.fOffsetDirection = 0 
-	tGenerated.fOffset 			= 0
-	
-	tGenerated.arFrames =
-	{
-		[1] = {fScale = tParams.fMaxSize * 0.8,	        		fTime = 0,			    fVelocityDirection = 0, fVelocityMagnitude = 5,						nColor = tParams.nBaseColor,	},
-		[2] = {fScale = tParams.fMaxSize,						fTime = .15,			fAlpha = 1.0,							},
-		[3] = {fScale = tParams.fMaxSize * tParams.fBigScale,	fTime = .30,							nColor = tParams.nBaseColor,	},
-		[4] = {fScale = tParams.fMaxSize,						fTime = .45,			fAlpha = 0.85,						},
-		[5] = {fScale = tParams.fMaxSize * tParams.fBigScale,	fTime = .75,			fAlpha = 0.65,						},
-		[6] = {													fTime = tParams.fMaxDuration,													fAlpha = 0.0,							},
-	}
-	
+	tGenerated.fOffsetDirection = 90
+	tGenerated.fOffset 			= math.random(0,6) - 3
+
+	local speed = tParams.fBigScale > 1 and 10 or 6
+
+	for i = 0, k_FrameCount do
+		tGenerated.arFrames[i+1].fVelocityDirection = 0
+		tGenerated.arFrames[i+1].fVelocityMagnitude = step(i, 2, speed, step(i, 6, 2, 6))
+	end
 	return tGenerated
 end
 
 ---------------------------------------------------------------------------------------------------
 function Patterns:PatternStraightDown(tParams, tGenerated)
 ---------------------------------------------------------------------------------------------------
-	tGenerated.fOffsetDirection  = 0
-	tGenerated.fOffset 			 = 0
-	
-	tGenerated.arFrames =
-	{
-		[1] = {fScale = tParams.fMaxSize * 0.8,	        		fTime = 0,			fVelocityDirection = 180, fVelocityMagnitude = 5, nColor = tParams.nBaseColor,	},
-		[2] = {fScale = tParams.fMaxSize,						fTime = .15,					fAlpha = 1.0,												},
-		[3] = {fScale = tParams.fMaxSize * tParams.fBigScale,	fTime = .30,					fAlpha = 0.95,						nColor = tParams.nBaseColor,	},
-		[4] = {fScale = tParams.fMaxSize,						fTime = .45,					fAlpha = 0.80,												},
-		[5] = {fScale = tParams.fMaxSize * tParams.fBigScale,	fTime = .75,					fAlpha = 0.65,												},
-		[6] = {													fTime = tParams.fMaxDuration,   fAlpha = 0.0,												},
-	}
-	
+	tGenerated.fOffsetDirection = 90
+	tGenerated.fOffset 			= math.random(0,8) - 4
+
+	local speed = tParams.fBigScale > 1 and 10 or 6
+
+	for i = 0, k_FrameCount do
+		tGenerated.arFrames[i+1].fVelocityDirection = 180
+		tGenerated.arFrames[i+1].fVelocityMagnitude = step(i, 2, speed, step(i, 6, 2, 6))
+	end
 	return tGenerated
 end
 
+---------------------------------------------------------------------------------------------------
+-- Set the Patterns for IronCombatText
+---------------------------------------------------------------------------------------------------
 IronCombatText.Patterns = Patterns
+---------------------------------------------------------------------------------------------------
